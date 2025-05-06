@@ -57,24 +57,50 @@ class Course(models.Model):
         return self.title
     
     
-class CourseFile(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='files')
-    file = models.FileField(upload_to='course_files/')
-    description = models.CharField(max_length=255, blank=True)
+
     
 
-class Task(models.Model):
+
+class Topic(models.Model):
     course = models.ForeignKey(
-        Course, on_delete=models.CASCADE, related_name='tasks'
+        Course,
+        on_delete=models.CASCADE,
+        related_name='topics'
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(
+        blank=True,
+        help_text="Общее описание темы (необязательно)"
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Порядок темы внутри курса"
+    )
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.course.title} → {self.title}"
+
+
+class Task(models.Model):
+    # Теперь связь идёт не напрямую с Course, а через Topic
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name='tasks'
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     min_words = models.PositiveIntegerField(default=100)
     expected_defense_time = models.PositiveIntegerField(default=10)
+    file = models.FileField(upload_to='tasks/')
+    class Meta:
+        ordering = ['id']  # или по своему полю order, если добавите
 
     def __str__(self):
-        return f"{self.title} | {self.course.title}"
-
+        return f"{self.title} | {self.topic.title}"
 
 class TeacherSchedule(models.Model):
     teacher = models.ForeignKey(
@@ -83,6 +109,7 @@ class TeacherSchedule(models.Model):
         limit_choices_to={'role': 'teacher'},
         related_name='schedule'
     )
+    title = models.CharField(max_length=255, blank=True)
     date = models.DateField() 
     start_time = models.TimeField()
     end_time = models.TimeField()

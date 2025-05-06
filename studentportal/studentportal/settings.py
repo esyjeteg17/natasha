@@ -43,6 +43,8 @@ INSTALLED_APPS = [
 	'rest_framework_simplejwt',
 	'core',
 	'corsheaders',
+    'django_filters',
+
 ]
 
 AUTH_USER_MODEL = 'core.CustomUser'
@@ -54,6 +56,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ),
+    
 }
 
 MIDDLEWARE = [
@@ -96,7 +102,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'natasha',
         'USER': 'postgres',
-        'PASSWORD': 'admin',
+        'PASSWORD': '1234',
         'HOST': 'localhost',
         'PORT': '5432',
     }

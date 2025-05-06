@@ -1,17 +1,20 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied
+from .filters import CourseFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
     Course, Task, TeacherSchedule,
-    Submission, DefenseQueue
+    Submission, DefenseQueue, Topic
 )
 from .serializers import (
     UserSerializer, CourseSerializer, TaskSerializer,
-    TeacherScheduleSerializer, SubmissionSerializer, DefenseQueueSerializer, RegisterSerializer
+    TeacherScheduleSerializer, SubmissionSerializer, DefenseQueueSerializer, RegisterSerializer, TopicSerializer
 )
 from .services import (
     check_file_basic, find_nearest_defense_slot, calculate_max_students_per_day
@@ -46,33 +49,24 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
-
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [
+        DjangoFilterBackend,       # django-filters
+        filters.SearchFilter,      # простой полнотекстовый поиск
+        filters.OrderingFilter,    # сортировка
+    ]
+    filterset_class = CourseFilter    # наш кастомный FilterSet
+    search_fields = ['title', 'description']
+    ordering_fields = ['title', 'hours', 'date']
+    ordering = ['-date']
 
-    def perform_create(self, serializer): 
+    def perform_create(self, serializer):
         if self.request.user.role != 'teacher':
-            raise PermissionError("Только преподаватель может создавать курсы.")
+            raise PermissionDenied("Только преподаватель может создавать курсы.")
         serializer.save(teacher=self.request.user)
-
-    @action(detail=True, methods=['GET'], url_path='recommendation')
-    def recommendation(self, request, pk=None):
-        course = self.get_object()
-        teacher = course.teacher
-        today = request.query_params.get('date')
-        if not today:
-            today = str(course.teacher.schedule.first().date) \
-                if course.teacher.schedule.exists() else None
-
-        if not today:
-            return Response({"error": "No schedule found"}, status=400)
-
-        from datetime import datetime
-        date_obj = datetime.strptime(today, '%Y-%m-%d').date()
-        max_students = calculate_max_students_per_day(teacher, date_obj)
-        return Response({"max_students": max_students})
 
 
 class TeacherScheduleViewSet(viewsets.ModelViewSet):
@@ -96,6 +90,30 @@ class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return super().get_queryset()
+
+    def perform_create(self, serializer):
+        topic = serializer.validated_data['topic']
+        # проверяем, что тема принадлежит курсу текущего преподавателя
+        if topic.course.teacher != self.request.user:
+            raise PermissionDenied("Нельзя создавать задачи не в своих темах.")
+        serializer.save()
+
+
+class TopicViewSet(viewsets.ModelViewSet):
+    queryset = Topic.objects.all()        
+    serializer_class = TopicSerializer
+
+    def get_queryset(self):
+        return super().get_queryset()
+
+    def perform_create(self, serializer):
+        course = serializer.validated_data['course']
+        # проверяем, что текущий юзер — владелец курса
+        if course.teacher != self.request.user:
+            raise PermissionDenied("Нельзя создавать темы не в своих курсах.")
+        serializer.save()
 
 
 class SubmissionViewSet(viewsets.ModelViewSet):

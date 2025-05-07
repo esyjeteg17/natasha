@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { NuxtLink } from '#components'
+
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -43,9 +45,9 @@ function logout() {
 			<!-- Navigation -->
 			<nav>
 				<ul class="flex space-x-5 text-sm">
-					<li><a href="#">Дисциплины</a></li>
+					<li><NuxtLink :to="{ name: 'my-courses' }">Дисциплины</NuxtLink></li>
 					<li><a href="#">Расписание</a></li>
-					<li><a href="#">Тестирование</a></li>
+					<!-- <li><a href="#">Тестирование</a></li> -->
 				</ul>
 			</nav>
 

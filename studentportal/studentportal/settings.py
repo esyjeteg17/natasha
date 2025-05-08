@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+from datetime import timedelta
 
 from pathlib import Path
 
@@ -61,6 +62,19 @@ REST_FRAMEWORK = {
     ),
     
 }
+
+SIMPLE_JWT = {
+    # Жизнь access-токена 7 дней
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    # Жизнь refresh-токена, например, 30 дней (можно убрать или настроить отдельно)
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    # Дополнительные опции по вкусу:
+    # 'ROTATE_REFRESH_TOKENS': False,
+    # 'BLACKLIST_AFTER_ROTATION': True,
+    # 'ALGORITHM': 'HS256',
+    # 'SIGNING_KEY': SECRET_KEY,
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -150,3 +164,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+# 3) Настройки MEDIA (для загружаемых пользователем файлов)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

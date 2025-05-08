@@ -117,48 +117,44 @@ class TopicViewSet(viewsets.ModelViewSet):
 
 
 class SubmissionViewSet(viewsets.ModelViewSet):
-    queryset = Submission.objects.all()
+    """
+    - Студенты могут создавать свои Submission (файл) — при создании автоматически ставится статус 'waiting_for_check'.
+    - Студенты видят только свои Submission.
+    - Преподаватели видят все Submission по курсам, которые они ведут, со статусом 'waiting_for_check'.
+    - Преподаватели могут обновлять статус (например, на 'approved' или 'rejected').
+    """
     serializer_class = SubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        if self.request.user.role == 'student':
-            return qs.filter(student=self.request.user)
-        return qs
+        user = self.request.user
+
+        # Преподаватель — только submissions на проверке в его курсах
+        if getattr(user, 'role', None) == 'teacher':
+            return Submission.objects.filter(
+                task__topic__course__teacher=user,
+                status='waiting_for_check'
+            )
+
+        # Студент — только свои submissions
+        if getattr(user, 'role', None) == 'student':
+            return Submission.objects.filter(student=user)
+
+        # Остальные ничего не видят
+        return Submission.objects.none()
 
     def perform_create(self, serializer):
-        submission = serializer.save(student=self.request.user)
-        task = submission.task
-        required_keywords = []
-        if task.keywords:
-            required_keywords = [k.strip() for k in task.keywords.split(',') if k.strip()]
+        user = self.request.user
 
-        file_path = submission.file.path
-        passed = check_file_basic(file_path, task.min_words, required_keywords)
-        if passed:
-            submission.ai_check_passed = True
-            submission.status = 'in_queue'
-        else:
-            submission.ai_check_passed = False
-            submission.status = 'rejected'
-        submission.save()
+        # Только студенты могут сдавать работу
+        if getattr(user, 'role', None) != 'student':
+            raise PermissionDenied("Только студенты могут отправлять Submission.")
 
-        if submission.ai_check_passed:
-            teacher = task.course.teacher
-            slot = find_nearest_defense_slot(teacher, task.expected_defense_time)
-            if slot is None:
-                submission.status = 'rejected'
-                submission.save()
-            else:
-                date, time = slot
-                DefenseQueue.objects.create(
-                    submission=submission,
-                    teacher=teacher,
-                    defense_date=date,
-                    defense_time=time,
-                    is_occupied=True
-                )
+        # Сохраняем student и сразу ставим статус на проверке
+        serializer.save(
+            student=user,
+            status='waiting_for_check'
+        )
 
 
 class DefenseQueueViewSet(viewsets.ModelViewSet):

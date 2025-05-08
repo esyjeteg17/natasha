@@ -50,15 +50,21 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class CourseViewSet(viewsets.ModelViewSet):
+    """
+    GET    /api/courses/          — общая страница всех курсов (любой автентифицированный увидит всё)
+    GET    /api/courses/me/       — личный кабинет преподавателя: только его курсы
+    POST   /api/courses/          — создать курс (только teacher)
+    """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated]
+
     filter_backends = [
-        DjangoFilterBackend,       # django-filters
-        filters.SearchFilter,      # простой полнотекстовый поиск
-        filters.OrderingFilter,    # сортировка
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
     ]
-    filterset_class = CourseFilter    # наш кастомный FilterSet
+    filterset_class = CourseFilter
     search_fields = ['title', 'description']
     ordering_fields = ['title', 'hours', 'date']
     ordering = ['-date']
@@ -67,6 +73,27 @@ class CourseViewSet(viewsets.ModelViewSet):
         if self.request.user.role != 'teacher':
             raise PermissionDenied("Только преподаватель может создавать курсы.")
         serializer.save(teacher=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='me')
+    def my_courses(self, request):
+        """
+        /api/courses/me/ — возвращает только курсы, где teacher == request.user.
+        Применяет фильтры / поиск / пагинацию так же, как и обычный list.
+        """
+        if request.user.role != 'teacher':
+            # можно возвращать пустой список или 403, на ваше усмотрение
+            return Response([], status=200)
+
+        qs = self.get_queryset().filter(teacher=request.user)
+        qs = self.filter_queryset(qs)
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
 
 class TeacherScheduleViewSet(viewsets.ModelViewSet):

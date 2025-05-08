@@ -6,6 +6,7 @@ export const useCoursesStore = defineStore('courses', () => {
 	const myCourses = ref<Course[]>([])
 	const currentCourse = ref<Course>()
 	const currentTopics = ref([])
+	const currentTasks = ref([])
 
 	const getCourses = async () => {
 		try {
@@ -62,7 +63,24 @@ export const useCoursesStore = defineStore('courses', () => {
 					},
 				}
 			)
-			currentCourse.value = data as Course
+			currentTopics.value = data
+		} catch (error) {
+			console.error('Error fetching my courses:', error)
+		}
+	}
+
+	const getTasks = async (id?: number) => {
+		try {
+			const { data } = await axios.get(
+				`http://127.0.0.1:8000/api/tasks/`,
+
+				{
+					headers: {
+						Authorization: `Bearer ${useAuthStore().accessToken}`,
+					},
+				}
+			)
+			currentTasks.value = data
 		} catch (error) {
 			console.error('Error fetching my courses:', error)
 		}
@@ -73,8 +91,11 @@ export const useCoursesStore = defineStore('courses', () => {
 		getCourses,
 		getCourse,
 		getTopics,
+		getTasks,
 		courses,
 		myCourses,
 		currentTopics,
+		currentCourse,
+		currentTasks,
 	}
 })

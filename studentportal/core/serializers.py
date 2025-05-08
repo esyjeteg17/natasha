@@ -43,7 +43,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = '__all__'
-        read_only_fields = ['student', 'ai_check_passed', 'status']
+        read_only_fields = ['student', 'ai_check_passed']
 
 
 class DefenseQueueSerializer(serializers.ModelSerializer):

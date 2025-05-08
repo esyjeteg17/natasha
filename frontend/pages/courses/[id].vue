@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NuxtLink } from '#components'
+type Topic = { id: number; title: string; description: string; order: number }
+type Task = { id: number; title: string; topic: number }
 
 const coursesStore = useCoursesStore()
 const isAuthenticated = useAuthStore().isAuthenticated
@@ -7,9 +8,24 @@ const isAuthenticated = useAuthStore().isAuthenticated
 const route = useRoute()
 const { id } = route.params
 
-if (!isAuthenticated) {
-	navigateTo('/login')
+onMounted(() => {
+	if (!isAuthenticated) {
+		navigateTo('/login')
+	}
+})
+
+function addTopic() {
+	navigateTo({ name: 'topics-create', query: { course: id } })
 }
+
+// навигация на создание задания (передаём id темы)
+function addTask(topicId: number) {
+	navigateTo({ name: 'tasks-create', query: { topic: topicId } })
+}
+
+const authStore = useAuthStore()
+
+const isTeacher = computed(() => authStore.user?.role === 'teacher')
 
 await Promise.all([
 	coursesStore.getCourse(+id),
@@ -17,7 +33,7 @@ await Promise.all([
 	coursesStore.getTasks(),
 ])
 
-const tabs = ['Курс', 'Участники', 'Оценки', 'Компетенции']
+const tabs = ['Курс', 'Информация о преподавателе']
 const activeTab = ref('Курс')
 
 const sections = computed(() => {
@@ -49,23 +65,95 @@ function toggleCompleted(sectionTitle: string, itemId: number) {
 	if (item) item.completed = !item.completed
 }
 
-function getIconComponent(type: string) {
-	switch (type) {
-		case 'video':
-			return {
-				template:
-					'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h9a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-			}
-		case 'pdf':
-			return {
-				template:
-					'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 ... Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-			}
-		default:
-			return {
-				template:
-					'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-			}
+const showAddTopicForm = ref(false)
+const newTopic = reactive({
+	title: '',
+	description: '',
+	order: sections.value.length + 1,
+})
+async function createTopic() {
+	try {
+		// Ensure numeric course ID
+		const payload = {
+			course: id,
+			title: newTopic.title,
+			description: newTopic.description,
+			order: newTopic.order,
+		}
+		const response = await fetch(`${authStore.baseURL}/api/topics/`, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${authStore.accessToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(payload),
+		})
+		if (!response.ok) {
+			const err = await response.json()
+			console.error('Topic creation error', err)
+			alert('Ошибка создания темы: ' + JSON.stringify(err))
+			return
+		}
+		await coursesStore.getTopics(+id)
+		newTopic.title = ''
+		newTopic.description = ''
+		newTopic.order = sections.value.length + 1
+		showAddTopicForm.value = false
+	} catch (e) {
+		console.error(e)
+		alert('Ошибка создания темы')
+	}
+}
+
+// Inline Add Task
+const showAddTaskFormFor = ref<number | null>(null)
+const newTask = reactive({
+	title: '',
+	description: '',
+	min_words: 100,
+	expected_defense_time: 10,
+	file: null as File | null,
+})
+function onTaskFileSelected(e: Event) {
+	const files = (e.target as HTMLInputElement).files
+	if (files && files.length) newTask.file = files[0]
+}
+async function createTask(topicId: number) {
+	try {
+		const formData = new FormData()
+		formData.append('topic', topicId)
+		formData.append('title', newTask.title)
+		formData.append('description', newTask.description)
+		formData.append('min_words', String(newTask.min_words))
+		formData.append(
+			'expected_defense_time',
+			String(newTask.expected_defense_time)
+		)
+		if (newTask.file) formData.append('file', newTask.file)
+
+		// Use native fetch to ensure multipart/form-data
+		const response = await fetch(`${authStore.baseURL}/api/tasks/`, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${authStore.accessToken}` },
+			body: formData,
+		})
+		if (!response.ok) {
+			const err = await response.json()
+			console.error('Task creation error', err)
+			alert('Ошибка создания задания: ' + JSON.stringify(err))
+			return
+		}
+		await coursesStore.getTasks()
+		// reset
+		newTask.title = ''
+		newTask.description = ''
+		newTask.min_words = 100
+		newTask.expected_defense_time = 10
+		newTask.file = null
+		showAddTaskFormFor.value = null
+	} catch (e) {
+		console.error(e)
+		alert('Ошибка создания задания')
 	}
 }
 </script>
@@ -82,10 +170,17 @@ function getIconComponent(type: string) {
 					}"
 					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
 				>
-					Мои курсы
+					Дисциплины
 				</NuxtLink>
 			</div>
 		</div>
+
+		<img
+			v-if="coursesStore.currentCourse?.img"
+			:src="coursesStore.currentCourse?.img"
+			alt=""
+			class="w-full h-72 my-6 rounded-lg object-cover"
+		/>
 
 		<nav class="border-b border-gray-200 mb-4">
 			<ul class="flex -mb-px">
@@ -106,44 +201,67 @@ function getIconComponent(type: string) {
 		</nav>
 
 		<div v-if="activeTab === 'Курс'">
+			<div class="flex justify-end mb-4" v-if="isTeacher">
+				<button
+					@click="showAddTopicForm = true"
+					class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+				>
+					+ Добавить тему
+				</button>
+			</div>
+			<div v-if="showAddTopicForm" class="bg-white p-6 rounded-lg shadow mb-6">
+				<h3 class="text-lg font-medium mb-4">Новая тема</h3>
+				<div class="space-y-4">
+					<input
+						v-model="newTopic.title"
+						type="text"
+						placeholder="Название темы"
+						class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+					/>
+					<textarea
+						v-model="newTopic.description"
+						rows="3"
+						placeholder="Описание темы"
+						class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+					></textarea>
+					<input
+						v-model.number="newTopic.order"
+						type="number"
+						min="1"
+						placeholder="Порядок"
+						class="w-24 px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+					/>
+					<div class="flex space-x-2">
+						<button
+							@click="createTopic"
+							class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+						>
+							Сохранить
+						</button>
+						<button
+							@click="showAddTopicForm = false"
+							class="px-4 py-2 border rounded hover:bg-gray-100"
+						>
+							Отмена
+						</button>
+					</div>
+				</div>
+			</div>
+
 			<div v-for="section in sections" :key="section.title" class="mb-6">
 				<button
 					class="w-full flex justify-between items-center bg-gray-100 p-4 rounded-t-md focus:outline-none"
 					@click="toggleSection(section.title)"
 				>
 					<span class="font-medium text-lg">{{ section.title }}</span>
-
-					<span>
-						<svg
-							v-if="openSections.includes(section.title)"
-							class="w-5 h-5 text-gray-600 transform rotate-180"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							/>
-						</svg>
-						<svg
-							v-else
-							class="w-5 h-5 text-gray-600"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							/>
-						</svg>
-					</span>
+					<IconsArrowTop
+						class="w-6 h-6"
+						:class="{
+							'transform rotate-180': !openSections.includes(section.title),
+						}"
+					/>
 				</button>
+
 				<div
 					v-show="openSections.includes(section.title)"
 					class="border border-t-0 border-gray-200 p-4 rounded-b-md"
@@ -154,19 +272,19 @@ function getIconComponent(type: string) {
 							:key="item.id"
 							class="flex items-center justify-between p-4 border-b last:border-b-0"
 						>
-							<div class="flex items-center space-x-4">
-								<component
-									:is="getIconComponent(item.type)"
-									class="w-8 h-8 text-blue-600"
-								/>
-								<div>
-									<NuxtLink :to="`/tasks/${item.id}`" class="font-medium">{{
-										item.title
-									}}</NuxtLink>
-								</div>
+							<div class="flex items-center gap-2">
+								<IconsTask />
+								<NuxtLink
+									:to="`/tasks/${item.id}`"
+									class="font-medium text-gray-800"
+								>
+									{{ item.title }}
+								</NuxtLink>
 							</div>
+
 							<button
-								class="px-3 py-1 border rounded focus:outline-none"
+								v-if="!isTeacher"
+								class="px-3 py-1 border rounded"
 								:class="
 									item.completed
 										? 'bg-green-600 text-white border-green-600'
@@ -178,6 +296,119 @@ function getIconComponent(type: string) {
 							</button>
 						</li>
 					</ul>
+					<div v-if="isTeacher">
+						<button
+							v-if="showAddTaskFormFor !== section.id"
+							@click="showAddTaskFormFor = section.id"
+							class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+						>
+							+ Добавить задание
+						</button>
+						<div v-else class="bg-gray-50 p-4 rounded space-y-3">
+							<input
+								v-model="newTask.title"
+								type="text"
+								placeholder="Название задания"
+								class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+							/>
+							<textarea
+								v-model="newTask.description"
+								rows="2"
+								placeholder="Описание"
+								class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+							></textarea>
+							<div class="flex space-x-2">
+								<input
+									v-model.number="newTask.min_words"
+									type="number"
+									min="1"
+									placeholder="Мин. слов"
+									class="w-24 px-2 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+								/>
+								<input
+									v-model.number="newTask.expected_defense_time"
+									type="number"
+									min="1"
+									placeholder="Мин защиты"
+									class="w-24 px-2 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+								/>
+							</div>
+							<div>
+								<input
+									type="file"
+									@change="onTaskFileSelected"
+									class="block text-gray-600"
+								/>
+								<p v-if="newTask.file" class="text-xs text-gray-500">
+									{{ newTask.file.name }}
+								</p>
+							</div>
+							<div class="flex space-x-2">
+								<button
+									@click="
+										createTask(
+											section.items[0]?.topic
+												? Number(section.items[0]?.topic)
+												: coursesStore.currentTopics.find(
+														t => t.title === section?.title
+												  )?.id
+										)
+									"
+									class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+								>
+									Сохранить
+								</button>
+								<button
+									@click="showAddTaskFormFor = null"
+									class="px-4 py-2 border rounded hover:bg-gray-100"
+								>
+									Отмена
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div v-else-if="activeTab === 'Информация о преподавателе'">
+			<div
+				class="flex flex-col md:flex-row items-center md:items-start gap-10 py-6"
+			>
+				<!-- Фото -->
+				<img
+					src="/img/profile.png"
+					alt="Фото преподавателя"
+					class="w-32 h-32 rounded-full object-cover"
+				/>
+
+				<!-- Основные данные -->
+				<div class="flex-1 space-y-2">
+					<h2 class="text-2xl font-semibold text-gray-800">
+						{{ coursesStore.currentCourse.teacher.first_name }}
+						{{ coursesStore.currentCourse.teacher.last_name }}
+					</h2>
+					<p class="text-gray-600">
+						<span class="font-medium">Email: </span>
+						<a
+							:href="`mailto:${coursesStore.currentCourse.teacher.email}`"
+							class="text-blue-600 hover:underline"
+						>
+							{{ coursesStore.currentCourse.teacher.email }}
+						</a>
+					</p>
+					<p class="text-gray-600">
+						<span class="font-medium">Телефон:</span>
+						{{ coursesStore.currentCourse.teacher.phone || 'Не указан' }}
+					</p>
+					<p class="text-gray-600">
+						<span class="font-medium">Дата регистрации:</span>
+						{{
+							new Date(
+								coursesStore.currentCourse.teacher.date_joined
+							).toLocaleDateString()
+						}}
+					</p>
 				</div>
 			</div>
 		</div>

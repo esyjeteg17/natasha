@@ -1,4 +1,18 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useCoursesStore } from '@/stores/courses'
+
+type Submission = {
+	id: number
+	file: string
+	created_at: string
+	student: { first_name: string; last_name: string }
+	status: string
+	ai_check_passed: boolean
+}
+
 type SubmissionState = {
 	statusDescription: string
 	evaluationStatus: string
@@ -7,32 +21,49 @@ type SubmissionState = {
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const coursesStore = useCoursesStore()
 
-const taskId = route.params.id as string
-const taskTitle = ref(
-	'Практическое занятие 2. Групповая презентация на тему: Презентация выбранного профиля'
-)
-const taskDuration = ref('6 акад. час.')
-const taskContent = ref<string[]>([])
-
-// Submission state
-const submissionState = ref<SubmissionState>({
-	statusDescription: 'Ответ на задание должен быть представлен вне сайта',
-	evaluationStatus: 'Не оценено',
+// Redirect if not authenticated
+onMounted(() => {
+	if (!authStore.isAuthenticated) {
+		router.push('/login')
+	}
 })
 
-// File upload
-const file = ref<File | null>(null)
+// Current task
+const taskId = Number(route.params.id)
+const currentTask = computed(() =>
+	coursesStore.currentTasks.find(item => item.id === taskId)
+)
 
+// Student Submission state
+const submissions = ref<Submission[]>([])
+const isTeacher = computed(() => authStore.user?.role === 'teacher')
+
+// Load submissions for both student and teacher
+onMounted(async () => {
+	try {
+		// Fetch all submissions for this task
+		const allSubs: any = await $fetch('/api/submissions/', {
+			baseURL: authStore.baseURL,
+			headers: { Authorization: `Bearer ${authStore.accessToken}` },
+			params: { task: taskId },
+		})
+		submissions.value = allSubs.results || allSubs
+	} catch (e) {
+		console.error('Не удалось загрузить ответы', e)
+	}
+})
+
+// File upload for students
+const file = ref<File | null>(null)
 function onFileSelected(e: Event) {
 	const files = (e.target as HTMLInputElement).files
-	if (files && files.length > 0) {
-		file.value = files[0]
-	}
+	if (files && files.length > 0) file.value = files[0]
 }
 
 async function submitAnswer() {
-	if (!authStore.user || authStore.user.role !== 'student') {
+	if (authStore.user?.role !== 'student') {
 		alert('Только студент может отправлять ответы.')
 		return
 	}
@@ -40,23 +71,17 @@ async function submitAnswer() {
 		alert('Пожалуйста, выберите файл ответа.')
 		return
 	}
-
 	try {
 		const formData = new FormData()
 		formData.append('file', file.value)
-		formData.append('task', taskId)
-
-		await $fetch('/api/submissions/', {
+		formData.append('task', String(taskId))
+		const resp: any = await $fetch('/api/submissions/', {
 			baseURL: authStore.baseURL,
 			method: 'POST',
 			body: formData,
 			headers: { Authorization: `Bearer ${authStore.accessToken}` },
 		})
-
-		submissionState.value = {
-			statusDescription: 'В очереди на проверку',
-			evaluationStatus: 'Не оценено',
-		}
+		submissions.value.push(resp)
 		alert('Ответ отправлен')
 	} catch (err: any) {
 		console.error('Ошибка отправки ответа', err)
@@ -64,69 +89,72 @@ async function submitAnswer() {
 	}
 }
 
-// Load task content (stubbed for now)
-onMounted(() => {
-	// TODO: Заменить на реальный запрос к API tasks/:id/
-	taskContent.value = [
-		'Цель работы: научиться работать в команде и заинтересовывать аудиторию.',
-		'Данная практическая работа выполняется в группе. Группа может состоять из 2-5 человек...',
-		'Также следует определить, кто будет переключать слайды...',
-	]
-})
+// Change status for teacher
+async function changeSubmissionStatus(sub: Submission, newStatus: string) {
+	try {
+		const resp = await fetch(
+			`${authStore.baseURL}/api/submissions/${sub.id}/`,
+			{
+				method: 'PATCH',
+				headers: {
+					Authorization: `Bearer ${authStore.accessToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status: newStatus }),
+			}
+		)
+		if (!resp.ok) {
+			const err = await resp.json()
+			console.error('Error updating submission', err)
+			alert('Не удалось изменить статус: ' + JSON.stringify(err))
+			return
+		}
+		sub.status = newStatus
+	} catch (e) {
+		console.error(e)
+		alert('Ошибка при отправке запроса')
+	}
+}
 </script>
 
 <template>
 	<div class="min-h-screen bg-gray-50">
-		<div class="max-w-7xl mx-auto py-8">
-			<div class="bg-white rounded-lg shadow p-6">
-				<!-- Title and Duration -->
+		<div class="max-w-7xl mx-auto py-8 px-4">
+			<div v-if="currentTask" class="bg-white rounded-lg shadow p-6 space-y-6">
+				<!-- Header -->
 				<div class="flex items-baseline justify-between">
-					<h1 class="text-2xl font-semibold text-gray-800">{{ taskTitle }}</h1>
-					<span class="text-sm text-gray-500">({{ taskDuration }})</span>
+					<h1 class="text-2xl font-semibold text-gray-800">
+						{{ currentTask.title }}
+					</h1>
+					<span class="text-sm text-gray-500"
+						>({{ currentTask.expected_defense_time }} мин)</span
+					>
 				</div>
 
-				<!-- Mark as Completed Button -->
-				<button
-					class="mt-4 px-4 py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 transition"
-				>
-					Отметить как выполненный
-				</button>
+				<!-- Download Task File -->
+				<div v-if="currentTask.file">
+					<a
+						:href="currentTask.file"
+						target="_blank"
+						class="inline-flex items-center text-blue-600 hover:underline"
+					>
+						<IconsDownloadFile class="w-5 h-5 mr-2 text-gray-600" /> Скачать
+						файл задания
+					</a>
+				</div>
 
-				<hr class="my-6 border-gray-200" />
-
-				<!-- Task Content -->
-				<div class="prose prose-gray">
-					<p v-for="(paragraph, idx) in taskContent" :key="idx">
-						{{ paragraph }}
+				<!-- Student View -->
+				<div v-if="!isTeacher">
+					<div class="prose prose-gray mb-4">
+						<p>{{ currentTask.description }}</p>
+					</div>
+					<p class="text-gray-700 mb-4">
+						<span class="font-medium">Мин. слов:</span>
+						{{ currentTask.min_words }}
 					</p>
-				</div>
 
-				<!-- Submission State -->
-				<div class="mt-8">
-					<h2 class="text-xl font-semibold mb-4 text-gray-800">
-						Состояние ответа
-					</h2>
-					<table class="w-full text-left border border-gray-200 mb-6">
-						<tbody>
-							<tr class="bg-gray-50">
-								<td class="px-4 py-2 font-medium">
-									Состояние ответа на задание
-								</td>
-								<td class="px-4 py-2">
-									{{ submissionState.statusDescription }}
-								</td>
-							</tr>
-							<tr>
-								<td class="px-4 py-2 font-medium">Состояние оценивания</td>
-								<td class="px-4 py-2">
-									{{ submissionState.evaluationStatus }}
-								</td>
-							</tr>
-						</tbody>
-					</table>
-
-					<!-- File Upload -->
-					<div class="space-y-4">
+					<!-- Submission form -->
+					<div class="space-y-4 mb-6">
 						<div>
 							<label class="block mb-2 text-sm font-medium text-gray-700"
 								>Прикрепить ответ</label
@@ -148,8 +176,108 @@ onMounted(() => {
 							Отправить ответ
 						</button>
 					</div>
+
+					<!-- Student Submissions List -->
+					<h2 class="text-xl font-semibold mb-4 text-gray-800">Мои ответы</h2>
+					<table class="w-full text-left border border-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-4 py-2">Файл</th>
+								<th class="px-4 py-2">Дата</th>
+								<th class="px-4 py-2">AI Check</th>
+								<th class="px-4 py-2">Статус</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="sub in submissions" :key="sub.id" class="border-t">
+								<td class="px-4 py-2">
+									<a
+										:href="sub.file"
+										target="_blank"
+										class="text-blue-600 hover:underline"
+										>Скачать</a
+									>
+								</td>
+								<td class="px-4 py-2">
+									{{ new Date(sub.created_at).toLocaleString() }}
+								</td>
+								<td class="px-4 py-2">
+									{{ sub.ai_check_passed ? 'OK' : 'Fail' }}
+								</td>
+								<td class="px-4 py-2">{{ sub.status }}</td>
+							</tr>
+							<tr v-if="!submissions.length">
+								<td colspan="4" class="px-4 py-2 text-center text-gray-500">
+									Нет ответов
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<!-- Teacher View -->
+				<div v-else>
+					<h2 class="text-xl font-semibold mb-4 text-gray-800">
+						Ответы студентов
+					</h2>
+					<table class="w-full text-left border border-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-4 py-2">Студент</th>
+								<th class="px-4 py-2">Файл</th>
+								<th class="px-4 py-2">Дата</th>
+								<th class="px-4 py-2">AI Check</th>
+								<th class="px-4 py-2">Статус</th>
+								<th class="px-4 py-2">Действие</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="sub in submissions" :key="sub.id" class="border-t">
+								<td class="px-4 py-2">
+									{{ sub.student.first_name }} {{ sub.student.last_name }}
+								</td>
+								<td class="px-4 py-2">
+									<a
+										:href="sub.file"
+										target="_blank"
+										class="text-blue-600 hover:underline"
+										>Скачать</a
+									>
+								</td>
+								<td class="px-4 py-2">
+									{{ new Date(sub.created_at).toLocaleString() }}
+								</td>
+								<td class="px-4 py-2">
+									{{ sub.ai_check_passed ? 'OK' : 'Fail' }}
+								</td>
+								<td class="px-4 py-2">{{ sub.status }}</td>
+								<td class="px-4 py-2 space-x-2">
+									<button
+										v-if="sub.status !== 'approved'"
+										@click="changeSubmissionStatus(sub, 'approved')"
+										class="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+									>
+										Принять
+									</button>
+									<button
+										v-if="sub.status !== 'rejected'"
+										@click="changeSubmissionStatus(sub, 'rejected')"
+										class="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+									>
+										Отклонить
+									</button>
+								</td>
+							</tr>
+							<tr v-if="!submissions.length">
+								<td colspan="6" class="px-4 py-2 text-center text-gray-500">
+									Нет ответов
+								</td>
+							</tr>
+						</tbody>
+					</table>
 				</div>
 			</div>
+			<div v-else class="text-center text-gray-500">Задание не найдено.</div>
 		</div>
 	</div>
 </template>

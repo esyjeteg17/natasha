@@ -1,6 +1,6 @@
 <template>
 	<section class="max-w-7xl mx-auto py-8 w-full">
-		<h1 class="text-3xl font-semibold mb-8">Мои курсы</h1>
+		<h1 class="text-3xl font-semibold mb-8">Дисциплины</h1>
 		<div>
 			<div
 				v-if="coursesStore.myCourses && coursesStore.myCourses"
@@ -11,7 +11,7 @@
 					v-for="course in coursesStore.myCourses"
 					:id="course.id"
 					:title="course.title"
-					:img:="course.img"
+					:img="course.img"
 					:description="course.description"
 					:teacher="course.teacher"
 					:date="course.date"
@@ -38,9 +38,11 @@ interface Course {
 const coursesStore = useCoursesStore()
 const isAuthenticated = useAuthStore().isAuthenticated
 
-if (!isAuthenticated) {
-	navigateTo('/login')
-}
+onMounted(() => {
+	if (!isAuthenticated) {
+		navigateTo('/login')
+	}
+})
 if (!coursesStore.myCourses.length) {
 	await coursesStore.getMyCourses()
 }

@@ -17,8 +17,8 @@ const q = ref('')
 				class="relative"
 				:id="5"
 				img="/img/courses/course_1.png"
-				title="Название dnjhjuj курса"
-				teacher="Категория 3"
+				title="Название первого курса"
+				teacher="Категория 1"
 				date="01 Мар 2024"
 			/>
 
@@ -27,9 +27,9 @@ const q = ref('')
 				class="relative"
 				:id="3"
 				img="/img/courses/course_1.png"
-				title="Название dnjhjuj курса"
-				teacher="Категория 3"
-				date="01 Мар 2024"
+				title="Название второго курса"
+				teacher="Категория 2"
+				date="13 Мар 2024"
 			/>
 
 			<CourseItemMain
@@ -39,7 +39,7 @@ const q = ref('')
 				img="/img/courses/course_1.png"
 				title="Название третьего курса"
 				teacher="Категория 3"
-				date="01 Мар 2024"
+				date="25 Май 2024"
 			/>
 		</div>
 	</section>

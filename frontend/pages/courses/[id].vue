@@ -33,7 +33,7 @@ await Promise.all([
 	coursesStore.getTasks(),
 ])
 
-const tabs = ['Курс', 'Информация о преподавателе']
+const tabs = ['Курс', 'Преподаватель и расписание']
 const activeTab = ref('Курс')
 
 const sections = computed(() => {
@@ -184,12 +184,7 @@ async function loadSchedules() {
 		})
 		// Если студент — оставляем только окна нужного преподавателя
 		if (isStudent.value) {
-			schedules.value = all.filter(
-				s =>
-					// сравниваем дату и время и берем только те, у кого в appointments есть student — но лучше расширить сериализатор
-					// пока просто показываем всё
-					true
-			)
+			schedules.value = all.filter(s => true)
 		} else {
 			schedules.value = all
 		}
@@ -480,7 +475,7 @@ onMounted(async () => {
 			</div>
 		</div>
 
-		<div v-else-if="activeTab === 'Информация о преподавателе'">
+		<div v-else-if="activeTab === 'Преподаватель и расписание'">
 			<div
 				class="flex flex-col md:flex-row items-center md:items-start gap-10 py-6"
 			>
@@ -521,8 +516,14 @@ onMounted(async () => {
 				</div>
 			</div>
 			<section class="mt-8">
-				<h2 v-if="isCurrentTeacher" class="text-2xl font-semibold mb-4">
+				<h2
+					v-if="isCurrentTeacher || isStudent"
+					class="text-2xl flex items-center gap-3 font-semibold mb-4"
+				>
 					Расписание приёмных окон
+					<button @click="loadSchedules">
+						<IconsReload class="w-5 h-5" />
+					</button>
 				</h2>
 
 				<!-- форма добавления (только для самого преподавателя) -->
@@ -588,19 +589,31 @@ onMounted(async () => {
 							<button
 								v-if="isStudent"
 								@click="
-									slot.appointments.some(a => a.id === authStore.user?.id)
+									slot.appointments.some(
+										a =>
+											a.first_name === authStore.user?.first_name &&
+											a.last_name === authStore.user?.last_name
+									)
 										? cancelSignup(slot.id)
 										: signup(slot.id)
 								"
 								:class="[
 									'px-3 py-1 rounded font-medium',
-									slot.appointments.some(a => a.id === authStore.user?.id)
+									slot.appointments.some(
+										a =>
+											a.first_name === authStore.user?.first_name &&
+											a.last_name === authStore.user?.last_name
+									)
 										? 'bg-red-600 text-white hover:bg-red-700'
 										: 'bg-blue-600 text-white hover:bg-blue-700',
 								]"
 							>
 								{{
-									slot.appointments.some(a => a.id === authStore.user?.id)
+									slot.appointments.some(
+										a =>
+											a.first_name === authStore.user?.first_name &&
+											a.last_name === authStore.user?.last_name
+									)
 										? 'Отменить запись'
 										: 'Записаться'
 								}}

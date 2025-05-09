@@ -131,7 +131,5 @@ class AppointmentSerializer(serializers.ModelSerializer):
         fields = ('id', 'student', 'created_at', 'position')
 
     def get_position(self, obj):
-        # Сбросить кеш релейшена
-        obj.schedule.appointments.cache_clear()
-        qs = obj.schedule.appointments.order_by('created_at')
+        qs = Appointment.objects.filter(schedule=obj.schedule).order_by('created_at')
         return list(qs).index(obj) + 1

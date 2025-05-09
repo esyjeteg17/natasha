@@ -25,43 +25,82 @@ const coursesStore = useCoursesStore()
 
 // Redirect if not authenticated
 onMounted(() => {
-	if (!authStore.isAuthenticated) {
-		router.push('/login')
-	}
+	if (!authStore.isAuthenticated) router.push('/login')
 })
 
-// Current task
+// Current task and its topic
 const taskId = Number(route.params.id)
 const currentTask = computed(() =>
-	coursesStore.currentTasks.find(item => item.id === taskId)
+	coursesStore.currentTasks.find(task => task.id === taskId)
+)
+const currentTopic = computed(() =>
+	coursesStore.currentTopics.find(
+		topic => topic.id === currentTask.value?.topic
+	)
 )
 
-// Student Submission state
+// Submission list
 const submissions = ref<Submission[]>([])
 const isTeacher = computed(() => authStore.user?.role === 'teacher')
 
-// Load submissions for both student and teacher
+// Load submissions filtered by task
 onMounted(async () => {
 	try {
-		// Fetch all submissions for this task
-		const allSubs: any = await $fetch('/api/submissions/', {
+		const { results, ...rest }: any = await $fetch('/api/submissions/', {
 			baseURL: authStore.baseURL,
 			headers: { Authorization: `Bearer ${authStore.accessToken}` },
 			params: { task: taskId },
 		})
-		submissions.value = allSubs.results || allSubs
+		const subs = results || rest
+		submissions.value = subs
+			.filter((s: Submission) => s.status === 'waiting_for_check')
+			.sort(
+				(a, b) =>
+					new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+			)
 	} catch (e) {
 		console.error('Не удалось загрузить ответы', e)
 	}
 })
 
+// Helpers
+const getSubmStatus = (status: string) => {
+	if (status === 'waiting_for_check') return 'Ожидает проверки'
+	if (status === 'approved') return 'Принято'
+	if (status === 'rejected') return 'Отклонено'
+	return status
+}
+const getAICheckedText = (passed: boolean) =>
+	passed ? 'Пройдена' : 'Не пройдена'
+
 // File upload for students
 const file = ref<File | null>(null)
 function onFileSelected(e: Event) {
 	const files = (e.target as HTMLInputElement).files
-	if (files && files.length > 0) file.value = files[0]
+	if (files && files.length) file.value = files[0]
 }
 
+// Run AI review via doc-review endpoint
+async function runDocReview(file: File, topic: string): Promise<boolean> {
+	const form = new FormData()
+	form.append('file', file)
+	form.append('topic', topic)
+	const resp = await fetch(`${authStore.baseURL}/api/doc-review/`, {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${authStore.accessToken}` },
+		body: form,
+	})
+	if (!resp.ok) {
+		const err = await resp.json()
+		console.error('AI review error', err)
+		alert('AI тест не прошёл: ' + JSON.stringify(err))
+		return false
+	}
+	const result: any = await resp.json()
+	return result.passed === true
+}
+
+// Submit answer: first run AI review, then create submission
 async function submitAnswer() {
 	if (authStore.user?.role !== 'student') {
 		alert('Только студент может отправлять ответы.')
@@ -71,6 +110,14 @@ async function submitAnswer() {
 		alert('Пожалуйста, выберите файл ответа.')
 		return
 	}
+	if (!currentTopic.value) {
+		alert('Не найдена тема задания.')
+		return
+	}
+	// AI check
+	const passed = await runDocReview(file.value, currentTopic.value.title)
+	if (!passed) return
+	// Proceed to submission
 	try {
 		const formData = new FormData()
 		formData.append('file', file.value)
@@ -82,14 +129,14 @@ async function submitAnswer() {
 			headers: { Authorization: `Bearer ${authStore.accessToken}` },
 		})
 		submissions.value.push(resp)
-		alert('Ответ отправлен')
+		alert('Ответ отправлен и ожидает проверки')
 	} catch (err: any) {
 		console.error('Ошибка отправки ответа', err)
 		alert('Ошибка: ' + (err.data?.detail || err.message))
 	}
 }
 
-// Change status for teacher
+// Change status by teacher
 async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 	try {
 		const resp = await fetch(
@@ -130,7 +177,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 						>({{ currentTask.expected_defense_time }} мин)</span
 					>
 				</div>
-
 				<!-- Download Task File -->
 				<div v-if="currentTask.file">
 					<a
@@ -142,7 +188,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 						файл задания
 					</a>
 				</div>
-
 				<!-- Student View -->
 				<div v-if="!isTeacher">
 					<div class="prose prose-gray mb-4">
@@ -152,7 +197,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 						<span class="font-medium">Мин. слов:</span>
 						{{ currentTask.min_words }}
 					</p>
-
 					<!-- Submission form -->
 					<div class="space-y-4 mb-6">
 						<div>
@@ -163,6 +207,7 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								type="file"
 								@change="onFileSelected"
 								class="block w-full text-gray-600"
+								accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 							/>
 							<p v-if="file" class="mt-2 text-xs text-gray-500">
 								Выбран: {{ file.name }}
@@ -176,7 +221,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 							Отправить ответ
 						</button>
 					</div>
-
 					<!-- Student Submissions List -->
 					<h2 class="text-xl font-semibold mb-4 text-gray-800">Мои ответы</h2>
 					<table class="w-full text-left border border-gray-200">
@@ -184,7 +228,7 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 							<tr>
 								<th class="px-4 py-2">Файл</th>
 								<th class="px-4 py-2">Дата</th>
-								<th class="px-4 py-2">AI Check</th>
+								<th class="px-4 py-2">ИИ Проверка</th>
 								<th class="px-4 py-2">Статус</th>
 							</tr>
 						</thead>
@@ -202,9 +246,9 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 									{{ new Date(sub.created_at).toLocaleString() }}
 								</td>
 								<td class="px-4 py-2">
-									{{ sub.ai_check_passed ? 'OK' : 'Fail' }}
+									{{ getAICheckedText(sub.ai_check_passed) }}
 								</td>
-								<td class="px-4 py-2">{{ sub.status }}</td>
+								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 							</tr>
 							<tr v-if="!submissions.length">
 								<td colspan="4" class="px-4 py-2 text-center text-gray-500">
@@ -214,7 +258,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 						</tbody>
 					</table>
 				</div>
-
 				<!-- Teacher View -->
 				<div v-else>
 					<h2 class="text-xl font-semibold mb-4 text-gray-800">
@@ -226,7 +269,7 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								<th class="px-4 py-2">Студент</th>
 								<th class="px-4 py-2">Файл</th>
 								<th class="px-4 py-2">Дата</th>
-								<th class="px-4 py-2">AI Check</th>
+								<th class="px-4 py-2">ИИ проверка</th>
 								<th class="px-4 py-2">Статус</th>
 								<th class="px-4 py-2">Действие</th>
 							</tr>
@@ -248,9 +291,9 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 									{{ new Date(sub.created_at).toLocaleString() }}
 								</td>
 								<td class="px-4 py-2">
-									{{ sub.ai_check_passed ? 'OK' : 'Fail' }}
+									{{ getAICheckedText(sub.ai_check_passed) }}
 								</td>
-								<td class="px-4 py-2">{{ sub.status }}</td>
+								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 								<td class="px-4 py-2 space-x-2">
 									<button
 										v-if="sub.status !== 'approved'"

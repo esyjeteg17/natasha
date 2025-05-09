@@ -298,13 +298,17 @@ async function createTask(topicId: number) {
 					</ul>
 					<div v-if="isTeacher">
 						<button
-							v-if="showAddTaskFormFor !== section.id"
-							@click="showAddTaskFormFor = section.id"
+							v-if="showAddTaskFormFor !== section.items[0].id"
+							@click="showAddTaskFormFor = section.items[0].id"
 							class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
 						>
 							+ Добавить задание
 						</button>
-						<div v-else class="bg-gray-50 p-4 rounded space-y-3">
+						<div
+							v-else-if="showAddTaskFormFor === section.items[0].id"
+							class="bg-gray-50 p-4 rounded space-y-3"
+						>
+							<h3 class="text-lg font-medium">Новое задание</h3>
 							<input
 								v-model="newTask.title"
 								type="text"

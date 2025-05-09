@@ -155,33 +155,29 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        qs = Submission.objects.all()
 
-        # Преподаватель — только submissions на проверке в его курсах
-        if getattr(user, 'role', None) == 'teacher':
-            return Submission.objects.filter(
-                task__topic__course__teacher=user,
-                status='waiting_for_check'
-            )
+        # если передан ?task=ID — сразу отфильтруем по нему
+        task_id = self.request.query_params.get('task')
+        if task_id is not None:
+            qs = qs.filter(task_id=task_id)
 
-        # Студент — только свои submissions
-        if getattr(user, 'role', None) == 'student':
-            return Submission.objects.filter(student=user)
+        # студент видит только свои сабмишны (вне зависимости от task-параметра)
+        if user.role == 'student':
+            return qs.filter(student=user)
 
-        # Остальные ничего не видят
+        # преподаватель видит только сабмишны к своим курсам
+        if user.role == 'teacher':
+            return qs.filter(task__topic__course__teacher=user)
+
+        # остальные не видят ничего
         return Submission.objects.none()
 
     def perform_create(self, serializer):
         user = self.request.user
-
-        # Только студенты могут сдавать работу
-        if getattr(user, 'role', None) != 'student':
+        if user.role != 'student':
             raise PermissionDenied("Только студенты могут отправлять Submission.")
-
-        # Сохраняем student и сразу ставим статус на проверке
-        serializer.save(
-            student=user,
-            status='waiting_for_check'
-        )
+        serializer.save(student=user, status='waiting_for_check')
 
 
 class DefenseQueueViewSet(viewsets.ModelViewSet):

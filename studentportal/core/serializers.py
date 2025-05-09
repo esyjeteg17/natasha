@@ -40,6 +40,8 @@ class TeacherScheduleSerializer(serializers.ModelSerializer):
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
+    student = UserSerializer(read_only=True)
+
     class Meta:
         model = Submission
         fields = '__all__'

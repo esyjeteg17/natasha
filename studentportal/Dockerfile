@@ -4,7 +4,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1
 
 # Установить зависимости apt
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && pip install --no-cache-dir gunicorn && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     postgresql-client \

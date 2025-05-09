@@ -153,7 +153,19 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+# settings.py
+import environ
+import os
+env = environ.Env(
+    # задаём типы и дефолты (опционально)
+    DEBUG=(bool, False),
+    GIGACHAT_VERIFY_SSL=(bool, True),
+)
 
+# 3) Читаем .env-файл
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+GIGACHAT_CREDENTIALS = env.str("GIGACHAT_CREDENTIALS")  # или просто строка JWT
+GIGACHAT_VERIFY_SSL = False  # или False, если нужно отключить в dev
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/

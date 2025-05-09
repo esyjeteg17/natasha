@@ -29,7 +29,7 @@ from core.views import (
     UserViewSet, CourseViewSet, TaskViewSet,
     TeacherScheduleViewSet, SubmissionViewSet, DefenseQueueViewSet, TopicViewSet
 )
-from neurocheck.serializers import DocumentReviewViewSet
+from neurocheck.views import DocumentReviewViewSet
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'courses', CourseViewSet)
@@ -47,6 +47,5 @@ urlpatterns = [
 
     path('api/', include(router.urls)),
 ]
-
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -7,7 +7,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied
 from .filters import CourseFilter
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from datetime import datetime, date
+from .models import Appointment
+from .serializers import AppointmentSerializer, AppointmentInfoSerializer
 from .models import (
     Course, Task, TeacherSchedule,
     Submission, DefenseQueue, Topic
@@ -97,7 +100,11 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 
 class TeacherScheduleViewSet(viewsets.ModelViewSet):
-    queryset = TeacherSchedule.objects.all()
+    queryset = (
+        TeacherSchedule.objects
+        .all()
+        .prefetch_related('appointments__student')  # чтобы избежать N+1 на вложенных студентах
+    )
     serializer_class = TeacherScheduleSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -109,9 +116,65 @@ class TeacherScheduleViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         if self.request.user.role != 'teacher':
-            raise PermissionError("Только преподаватель может создавать расписание.")
+            raise PermissionError("Только преподаватель может создать расписание.")
         serializer.save(teacher=self.request.user)
 
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def appointments(self, request, pk=None):
+        """
+        Список всех записей (очереди) для конкретного окна.
+        """
+        schedule = self.get_object()
+        qs = schedule.appointments.select_related('student')
+        serializer = AppointmentSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def signup(self, request, pk=None):
+        """
+        Записаться на это окно (текущий пользователь).
+        """
+        if request.user.role != 'student':
+            raise PermissionDenied("Только студент может записаться.")
+        schedule = self.get_object()
+        # проверка наличия свободных мест
+        slot_minutes = 15
+        start_dt = datetime.combine(date.today(), schedule.start_time)
+        end_dt   = datetime.combine(date.today(), schedule.end_time)
+        total_min = (end_dt - start_dt).total_seconds() / 60
+        max_slots = int(total_min // slot_minutes)
+        if schedule.appointments.count() >= max_slots:
+            raise ValidationError("В этом окне нет свободных мест.")
+        # создаём запись (или возвращаем ошибку, если уже есть)
+        appt, created = Appointment.objects.get_or_create(
+            schedule=schedule,
+            student=request.user
+        )
+        if not created:
+            return Response(
+                {"detail": "Вы уже записаны на это окно."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(
+            AppointmentSerializer(appt).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAuthenticated])
+    def cancel_signup(self, request, pk=None):
+        """
+        Отменить свою запись на это окно.
+        """
+        schedule = self.get_object()
+        try:
+            appt = Appointment.objects.get(schedule=schedule, student=request.user)
+        except Appointment.DoesNotExist:
+            return Response(
+                {"detail": "Вы не записаны на это окно."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        appt.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
@@ -210,3 +273,46 @@ class DefenseQueueViewSet(viewsets.ModelViewSet):
         dq.save()
         return Response({"detail": "Rescheduled successfully"})
 
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    """
+    CRUD для записей студентов в очередь на защиту.
+    """
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'student':
+            # студент видит только свою очередь
+            return user.appointments.select_related('schedule')
+        if user.role == 'teacher':
+            # преподаватель — всех, кто записался на его расписания
+            return Appointment.objects.filter(schedule__teacher=user)
+        # остальным (напр. админам) — всё
+        return super().get_queryset()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role != 'student':
+            raise PermissionDenied("Только студент может записаться в очередь.")
+        schedule_id = self.request.data.get('schedule')
+        schedule = get_object_or_404(TeacherSchedule, id=schedule_id)
+        # проверка на свободные места (валидируется ещё в clean(), но лучше заранее)
+        slot_minutes = 15
+        duration = (
+            datetime.combine(date.today(), schedule.end_time)
+            - datetime.combine(date.today(), schedule.start_time)
+        ).total_seconds() / 60
+        max_slots = int(duration // slot_minutes)
+        if schedule.appointments.count() >= max_slots:
+            raise ValidationError("В очереди нет свободных мест.")
+        # сохраняем, привязывая текущего пользователя
+        serializer.save(student=user)
+
+    def perform_destroy(self, instance):
+        # студент может выйти только из своей очереди
+        if instance.student != self.request.user:
+            raise PermissionDenied("Нельзя убрать чужую запись.")
+        instance.delete()

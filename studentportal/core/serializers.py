@@ -2,8 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
     Course, Task, TeacherSchedule,
-    Submission, DefenseQueue, Topic
+    Submission, DefenseQueue, Topic, Appointment
 )
+from datetime import datetime, date
 
 User = get_user_model()
 
@@ -32,12 +33,49 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = '__all__'
 
+class AppointmentInfoSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='student.first_name', read_only=True)
+    last_name  = serializers.CharField(source='student.last_name',  read_only=True)
+    position   = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Appointment
+        fields = ('id', 'first_name', 'last_name', 'created_at', 'position')
+
+    def get_position(self, obj):
+        # Берём свежий QuerySet из БД, чтобы в нём был и только что созданный апойнтмент
+        qs = Appointment.objects.filter(schedule=obj.schedule).order_by('created_at')
+        return list(qs).index(obj) + 1
+    
 class TeacherScheduleSerializer(serializers.ModelSerializer):
+    appointments_count  = serializers.SerializerMethodField()
+    max_slots           = serializers.SerializerMethodField()
+    available_slots     = serializers.SerializerMethodField()
+    duration_minutes    = serializers.SerializerMethodField()
+    # вот наше новое поле
+    appointments        = AppointmentInfoSerializer(many=True, read_only=True)
+
     class Meta:
         model = TeacherSchedule
-        fields = '__all__'
+        fields = [
+            'id', 'title', 'date', 'start_time', 'end_time',
+            'duration_minutes', 'max_slots', 'appointments_count', 'available_slots',
+            'appointments',
+        ]
 
+    def get_duration_minutes(self, obj):
+        start_dt = datetime.combine(date.today(), obj.start_time)
+        end_dt   = datetime.combine(date.today(), obj.end_time)
+        return int((end_dt - start_dt).total_seconds() // 60)
+
+    def get_max_slots(self, obj):
+        return self.get_duration_minutes(obj) // 15
+
+    def get_appointments_count(self, obj):
+        return obj.appointments.count()
+
+    def get_available_slots(self, obj):
+        return self.get_max_slots(obj) - self.get_appointments_count(obj)
 
 class SubmissionSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
@@ -80,3 +118,20 @@ class RegisterSerializer(serializers.ModelSerializer):
             user.role = 'student'
         user.save()
         return user
+    
+
+    
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    student = serializers.ReadOnlyField(source='student.username')
+    position = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = ('id', 'student', 'created_at', 'position')
+
+    def get_position(self, obj):
+        # Сбросить кеш релейшена
+        obj.schedule.appointments.cache_clear()
+        qs = obj.schedule.appointments.order_by('created_at')
+        return list(qs).index(obj) + 1

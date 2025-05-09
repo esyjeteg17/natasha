@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from datetime import datetime, date
+from django.core.exceptions import ValidationError
 
 class StudentGroup(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -158,5 +160,39 @@ class DefenseQueue(models.Model):
 
 
 
+class Appointment(models.Model):
+    """
+    Запись студента на конкретное расписание.
+    Позиция рассчитывается по created_at.
+    """
+    schedule = models.ForeignKey(
+        TeacherSchedule,
+        on_delete=models.CASCADE,
+        related_name='appointments'
+    )
+    student = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': 'student'},
+        related_name='appointments'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        # нельзя дважды записаться на одно и то же окно
+        unique_together = ('schedule', 'student')
+        ordering = ['created_at']
 
+    def clean(self):
+        # проверяем, что не превысили число слотов
+        slot_minutes = 15
+        start_dt = datetime.combine(date.today(), self.schedule.start_time)
+        end_dt = datetime.combine(date.today(), self.schedule.end_time)
+        total_min = (end_dt - start_dt).total_seconds() / 60
+        max_slots = int(total_min // slot_minutes)
+        if self.schedule.appointments.count() >= max_slots:
+            raise ValidationError("В этом окне нет свободных мест.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

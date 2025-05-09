@@ -65,7 +65,7 @@ def lemmatize(word: str) -> str:
     return morph.parse(word)[0].normal_form
 
 def get_keywords_and_topic(docx_path, top_n=10):
-    nltk.download('stopwords')
+    # nltk.download('stopwords')
     text = load_docx_text(docx_path)
     custom = {"шаг","k","к","и","а","но","в","об","о","рисунок","её","ей"}
     stop_words = set(stopwords.words('russian')) | custom

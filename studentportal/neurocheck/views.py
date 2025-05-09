@@ -87,9 +87,17 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
         try:
             find('corpora/stopwords')
         except LookupError:
+            # на macOS/других может потребоваться отключить проверку SSL для загрузки
+            import ssl
+            try:
+                _create_unverified_https_context = ssl._create_unverified_context
+            except AttributeError:
+                pass
+            else:
+                ssl._create_default_https_context = _create_unverified_https_context
             nltk.download('stopwords', quiet=True)
 
-        # 6) извлечение ключевых слов и темы из документа
+        # 6) извлечение ключевых слов и темы из документа) извлечение ключевых слов и темы из документа
         top_words, extracted_topic = get_keywords_and_topic(tmp_path, top_n=5)
         keywords_data = [{"keyword": w, "count": c} for w, c in top_words]
 

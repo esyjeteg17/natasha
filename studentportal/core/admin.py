@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import CustomUser, Course, Task, TeacherSchedule, Submission, DefenseQueue, Topic
+from core.models import CustomUser, Course, Task, TeacherSchedule, Submission, DefenseQueue, Topic, Appointment
 
 admin.site.register(CustomUser)
 admin.site.register(Course)
@@ -9,4 +9,4 @@ admin.site.register(TeacherSchedule)
 admin.site.register(Submission)
 admin.site.register(DefenseQueue)
 admin.site.register(Topic)
-# Register your models here.
+admin.site.register(Appointment)

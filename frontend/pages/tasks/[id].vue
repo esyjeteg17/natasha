@@ -53,8 +53,8 @@ onMounted(async () => {
 		})
 		const subs = results || rest
 		submissions.value = subs
-			.filter((s: Submission) => s.status === 'waiting_for_check')
-			.sort(
+			?.filter((s: Submission) => s.status === 'waiting_for_check')
+			?.sort(
 				(a, b) =>
 					new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 			)

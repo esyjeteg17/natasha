@@ -10,7 +10,9 @@ export const useCoursesStore = defineStore('courses', () => {
 
 	const getCourses = async () => {
 		try {
-			const { data } = await axios.get('http://127.0.0.1:8000/api/courses/')
+			const { data } = await axios.get(
+				'https://uchebnyicourse-k-n.ru/api/courses/'
+			)
 			courses.value = data as Course[]
 		} catch (error) {
 			console.error('Error fetching courses:', error)
@@ -20,7 +22,7 @@ export const useCoursesStore = defineStore('courses', () => {
 	const getMyCourses = async (id?: number) => {
 		try {
 			const { data } = await axios.get(
-				'http://127.0.0.1:8000/api/courses/',
+				'https://uchebnyicourse-k-n.ru/api/courses/',
 
 				{
 					params: { id: id },
@@ -38,7 +40,7 @@ export const useCoursesStore = defineStore('courses', () => {
 	const getCourse = async (id?: number) => {
 		try {
 			const { data } = await axios.get(
-				`http://127.0.0.1:8000/api/courses/${id}/`,
+				`https://uchebnyicourse-k-n.ru/api/courses/${id}/`,
 
 				{
 					headers: {
@@ -55,7 +57,7 @@ export const useCoursesStore = defineStore('courses', () => {
 	const getTopics = async (id?: number) => {
 		try {
 			const { data } = await axios.get(
-				`http://127.0.0.1:8000/api/topics/`,
+				`https://uchebnyicourse-k-n.ru/api/topics/`,
 
 				{
 					headers: {
@@ -72,7 +74,7 @@ export const useCoursesStore = defineStore('courses', () => {
 	const getTasks = async (id?: number) => {
 		try {
 			const { data } = await axios.get(
-				`http://127.0.0.1:8000/api/tasks/`,
+				`https://uchebnyicourse-k-n.ru/api/tasks/`,
 
 				{
 					headers: {

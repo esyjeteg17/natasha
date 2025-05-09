@@ -10,7 +10,7 @@ const authStore = useAuthStore()
 
 async function onRegister() {
 	try {
-		const resp: any = await $fetch('http://127.0.0.1:8000/api/users/', {
+		const resp: any = await $fetch('https://uchebnyicourse-k-n.ru/api/users/', {
 			method: 'POST',
 			body: {
 				username: username.value,

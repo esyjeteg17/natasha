@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
 	const accessToken = ref<string | null>(null)
 	const refreshToken = ref<string | null>(null)
 	const user = ref<UserData | null>(null)
-	const baseURL = 'http://127.0.0.1:8000'
+	const baseURL = 'https://uchebnyicourse-k-n.ru'
 	let refreshTimeout: ReturnType<typeof setTimeout> | null = null
 
 	// 2. Вычисляемые свойства

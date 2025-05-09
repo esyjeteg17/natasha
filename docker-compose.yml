@@ -1,0 +1,50 @@
+version: '3'
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - '3001:3000'
+    environment:
+      - NODE_ENV=production
+    restart: always
+    networks:
+      - studentportal
+
+  studentportal:
+    build:
+      context: ./studentportal
+    container_name: studentportal
+    ports:
+      - '8000:8000'
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings
+    depends_on:
+      - db
+    restart: always
+    networks:
+      - studentportal
+    volumes:
+      - ./studentportal/core/migrations:/app/core/migrations
+      - ./studentportal:/app
+
+  db:
+    image: postgres:16
+    container_name: db
+    environment:
+      - POSTGRES_DB=studentportal_db
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - studentportal
+
+networks:
+  studentportal:
+    driver: bridge
+
+volumes:
+  pgdata:

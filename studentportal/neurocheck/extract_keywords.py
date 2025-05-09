@@ -15,7 +15,7 @@ import nltk
 import pymorphy2
 
 # При первом запуске, если ещё не скачали стоп-слова:
-# nltk.download('stopwords')
+nltk.download('stopwords')
 
 from nltk.corpus import stopwords
 

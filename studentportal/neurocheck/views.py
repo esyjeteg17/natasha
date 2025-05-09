@@ -1,11 +1,13 @@
 import tempfile
 import json
+import nltk
+from nltk.data import find
 from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ValidationError
 
 from gigachat import GigaChat
 from gigachat.api.utils import ResponseError
@@ -81,11 +83,17 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
         full_text = self.extract_full_text(tmp_path)
         word_count = len(full_text.split())
 
-        # 5) извлечение ключевых слов и темы из документа
+        # 5) проверяем и скачиваем стоп-слова NLTK, если нужно
+        try:
+            find('corpora/stopwords')
+        except LookupError:
+            nltk.download('stopwords', quiet=True)
+
+        # 6) извлечение ключевых слов и темы из документа
         top_words, extracted_topic = get_keywords_and_topic(tmp_path, top_n=5)
         keywords_data = [{"keyword": w, "count": c} for w, c in top_words]
 
-        # 6) подготовка к запросам GigaChat
+        # 7) подготовка к запросам GigaChat
         creds = getattr(settings, 'GIGACHAT_CREDENTIALS', None)
         if not creds:
             raise APIException("Не задана настройка GIGACHAT_CREDENTIALS")
@@ -118,13 +126,14 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
         except Exception as e:
             raise APIException(f"Ошибка при обращении к GigaChat: {e}")
 
-        # 7) парсинг passed
+        # 8) парсинг passed
         passed = True if raw_pass == 'true' else False
 
-        # 8) возвращаем фронтенду
+        # 9) возвращаем фронтенду
         return Response({
             "evaluation": raw_evaluation,
             "keywords": keywords_data,
+            "extracted_topic": extracted_topic,
             "word_count": word_count,
             "passed": passed,
         }, status=status.HTTP_200_OK)

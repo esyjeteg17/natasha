@@ -22,4 +22,4 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . /app
 
 # Запустить приложение через Gunicorn
-CMD ["gunicorn", "--workers=4", "--threads=2", "--timeout=90", "--bind=0.0.0.0:8000", "backend.asgi:application", "-k", "uvicorn.workers.UvicornWorker"]
+CMD ["gunicorn", "--workers=4", "--threads=2", "--timeout=90", "--bind=0.0.0.0:8000", "studentportal.asgi:application", "-k", "uvicorn.workers.UvicornWorker"]

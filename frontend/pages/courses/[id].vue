@@ -156,6 +156,111 @@ async function createTask(topicId: number) {
 		alert('Ошибка создания задания')
 	}
 }
+
+const currentCourse = computed(() => coursesStore.currentCourse)
+const isCurrentTeacher = computed(
+	() =>
+		authStore.user?.role === 'teacher' &&
+		authStore.user?.id === currentCourse.value?.teacher.id
+)
+const isStudent = computed(() => authStore.user?.role === 'student')
+
+// Список окон расписания
+const schedules = ref<Schedule[]>([])
+
+// Форма для создания нового окна (только для преподавателя)
+const newWindow = reactive({
+	title: '',
+	date: '', // yyyy-MM-dd
+	start_time: '', // HH:mm:ss
+	end_time: '', // HH:mm:ss
+})
+
+async function loadSchedules() {
+	try {
+		const all: Schedule[] = await $fetch('/api/teacher-schedules/', {
+			baseURL: authStore.baseURL,
+			headers: { Authorization: `Bearer ${authStore.accessToken}` },
+		})
+		// Если студент — оставляем только окна нужного преподавателя
+		if (isStudent.value) {
+			schedules.value = all.filter(
+				s =>
+					// сравниваем дату и время и берем только те, у кого в appointments есть student — но лучше расширить сериализатор
+					// пока просто показываем всё
+					true
+			)
+		} else {
+			schedules.value = all
+		}
+	} catch (e) {
+		console.error('Не удалось загрузить расписание', e)
+	}
+}
+
+// создание окна (teacher only)
+async function createWindow() {
+	try {
+		await $fetch('/api/teacher-schedules/', {
+			baseURL: authStore.baseURL,
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${authStore.accessToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: { ...newWindow },
+		})
+		// сброс формы
+		newWindow.title =
+			newWindow.date =
+			newWindow.start_time =
+			newWindow.end_time =
+				''
+		await loadSchedules()
+	} catch (err: any) {
+		alert('Ошибка создания окна: ' + JSON.stringify(err.data || err))
+	}
+}
+
+// студент записывается
+async function signup(slotId: number) {
+	try {
+		await fetch(
+			`${authStore.baseURL}/api/teacher-schedules/${slotId}/signup/`,
+			{
+				method: 'POST',
+				headers: { Authorization: `Bearer ${authStore.accessToken}` },
+			}
+		)
+		await loadSchedules()
+	} catch (err: any) {
+		alert('Не получилось записаться: ' + JSON.stringify(err.data || err))
+	}
+}
+// студент отменяет запись
+async function cancelSignup(slotId: number) {
+	try {
+		await fetch(
+			`${authStore.baseURL}/api/teacher-schedules/${slotId}/cancel_signup/`,
+			{
+				method: 'DELETE',
+				headers: { Authorization: `Bearer ${authStore.accessToken}` },
+			}
+		)
+		await loadSchedules()
+	} catch (err: any) {
+		alert('Не получилось отменить запись: ' + JSON.stringify(err.data || err))
+	}
+}
+
+onMounted(async () => {
+	if (!authStore.isAuthenticated) {
+		navigateTo('/login')
+	}
+	// сначала нужно загрузить курс
+	await coursesStore.getCourse(+route.params.id)
+	await loadSchedules()
+})
 </script>
 <template>
 	<div class="w-full max-w-7xl mx-auto py-6">
@@ -415,6 +520,112 @@ async function createTask(topicId: number) {
 					</p>
 				</div>
 			</div>
+			<section class="mt-8">
+				<h2 v-if="isCurrentTeacher" class="text-2xl font-semibold mb-4">
+					Расписание приёмных окон
+				</h2>
+
+				<!-- форма добавления (только для самого преподавателя) -->
+				<div v-if="isCurrentTeacher" class="mb-6 bg-white p-4 rounded shadow">
+					<h3 class="font-medium mb-2">Добавить новое окно</h3>
+					<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+						<input
+							v-model="newWindow.title"
+							placeholder="Заголовок"
+							class="border p-2 rounded"
+						/>
+						<input
+							v-model="newWindow.date"
+							type="date"
+							class="border p-2 rounded"
+						/>
+						<input
+							v-model="newWindow.start_time"
+							type="time"
+							class="border p-2 rounded"
+						/>
+						<input
+							v-model="newWindow.end_time"
+							type="time"
+							class="border p-2 rounded"
+						/>
+					</div>
+					<button
+						@click="createWindow"
+						class="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+					>
+						Сохранить
+					</button>
+				</div>
+
+				<!-- список окон -->
+				<div class="space-y-4">
+					<div
+						v-for="slot in schedules"
+						:key="slot.id"
+						class="bg-white p-4 rounded shadow flex flex-col md:flex-row md:justify-between md:items-center"
+					>
+						<div>
+							<p class="font-medium">{{ slot.title }}</p>
+							<p class="text-sm text-gray-600">
+								{{ new Date(slot.date).toLocaleDateString() }}
+								({{
+									new Date(slot.date).toLocaleString('ru-RU', {
+										weekday: 'long',
+									})
+								}}) с {{ slot.start_time.slice(0, 5) }} до
+								{{ slot.end_time.slice(0, 5) }} ({{ slot.duration_minutes }}
+								мин)
+							</p>
+							<p class="text-sm">
+								Свободно: {{ slot.available_slots }} / {{ slot.max_slots }}
+							</p>
+						</div>
+
+						<!-- действия -->
+						<div class="mt-3 md:mt-0 space-x-2">
+							<!-- студент -->
+							<button
+								v-if="isStudent"
+								@click="
+									slot.appointments.some(a => a.id === authStore.user?.id)
+										? cancelSignup(slot.id)
+										: signup(slot.id)
+								"
+								:class="[
+									'px-3 py-1 rounded font-medium',
+									slot.appointments.some(a => a.id === authStore.user?.id)
+										? 'bg-red-600 text-white hover:bg-red-700'
+										: 'bg-blue-600 text-white hover:bg-blue-700',
+								]"
+							>
+								{{
+									slot.appointments.some(a => a.id === authStore.user?.id)
+										? 'Отменить запись'
+										: 'Записаться'
+								}}
+							</button>
+
+							<!-- преподаватель видит список записавшихся -->
+							<ul v-if="isCurrentTeacher" class="mt-4 space-y-1 text-sm">
+								<li
+									v-for="appt in slot.appointments"
+									:key="appt.id"
+									class="flex justify-between px-2"
+								>
+									<span
+										>{{ appt.position }}. {{ appt.first_name }}
+										{{ appt.last_name }}</span
+									>
+								</li>
+								<li v-if="!slot.appointments.length" class="text-gray-500">
+									Никто не записан
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</section>
 		</div>
 
 		<!-- Placeholder for other tabs -->

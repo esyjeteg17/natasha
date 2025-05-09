@@ -30,12 +30,6 @@ ALLOWED_HOSTS = []
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
-
-MEDIA_URL= '/media/'
-MEDIA_ROOT= os.path.join(BASE_DIR, 'media')
-
 
 # Application definition
 
@@ -120,10 +114,10 @@ WSGI_APPLICATION = 'studentportal.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'studentportal_db',
-        'USER': 'root',
-        'PASSWORD': 'root',
-        'HOST': 'db',
+        'NAME': 'natasha',
+        'USER': 'postgres',
+        'PASSWORD': '1234',
+        'HOST': 'localhost',
         'PORT': '5432',
     }
 }

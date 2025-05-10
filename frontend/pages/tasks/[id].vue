@@ -53,11 +53,6 @@ async function loadSubmissions() {
 		})
 		const subs = results || rest
 		submissions.value = subs
-			.filter((s: Submission) => s.status === 'waiting_for_check')
-			.sort(
-				(a, b) =>
-					new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-			)
 	} catch (e) {
 		console.error('Не удалось загрузить ответы', e)
 	}
@@ -229,11 +224,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								</td>
 								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 							</tr>
-							<tr v-if="!submissions.length">
-								<td colspan="4" class="py-4 text-center text-gray-500">
-									Нет ответов
-								</td>
-							</tr>
 						</tbody>
 					</table>
 				</div>
@@ -284,11 +274,6 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 									>
 										Отклонить
 									</button>
-								</td>
-							</tr>
-							<tr v-if="!submissions.length">
-								<td colspan="6" class="py-4 text-center text-gray-500">
-									Нет ответов
 								</td>
 							</tr>
 						</tbody>

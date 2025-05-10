@@ -42,6 +42,7 @@ const sections = computed(() => {
 		.map(item => {
 			return {
 				title: item.title,
+				description: item.description,
 				items: coursesStore.currentTasks.filter(i => i.topic === item.id),
 			}
 		})
@@ -366,6 +367,9 @@ onMounted(async () => {
 					v-show="openSections.includes(section.title)"
 					class="border border-t-0 border-gray-200 p-4 rounded-b-md"
 				>
+					<p v-if="section.description" class="text-gray-700 mb-4">
+						{{ section.description }}
+					</p>
 					<ul>
 						<li
 							v-for="item in section.items"

@@ -35,6 +35,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://uchebnyicourse-k-n.ru',
+    'https://www.uchebnyicourse-k-n.ru',
+]
+
+# если работаете за обратным прокси (nginx), чтобы Django знал, что запросы по HTTPS:
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 # Application definition

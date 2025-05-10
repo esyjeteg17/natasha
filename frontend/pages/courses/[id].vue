@@ -183,11 +183,15 @@ async function loadSchedules() {
 			baseURL: authStore.baseURL,
 			headers: { Authorization: `Bearer ${authStore.accessToken}` },
 		})
-		// Если студент — оставляем только окна нужного преподавателя
+
 		if (isStudent.value) {
-			schedules.value = all.filter(s => true)
+			schedules.value = all.filter(
+				s => s.teacher.id === coursesStore.currentCourse.teacher.id
+			)
 		} else {
-			schedules.value = all
+			schedules.value = all.filter(
+				s => s.teacher.id === coursesStore.currentCourse.teacher.id
+			)
 		}
 	} catch (e) {
 		console.error('Не удалось загрузить расписание', e)
@@ -247,6 +251,39 @@ async function cancelSignup(slotId: number) {
 	} catch (err: any) {
 		alert('Не получилось отменить запись: ' + JSON.stringify(err.data || err))
 	}
+}
+
+const uniqueDates = computed(() => {
+	const dates = Array.from(new Set(schedules.value.map(s => s.date)))
+	return dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+})
+
+// группируем по дате
+const byDate = computed(() => {
+	const m: Record<string, Schedule[]> = {}
+	uniqueDates.value.forEach(d => (m[d] = []))
+	schedules.value.forEach(s => m[s.date].push(s))
+	// для стабильности отсортируем внутри дня по времени
+	Object.values(m).forEach(arr =>
+		arr.sort((a, b) => a.start_time.localeCompare(b.start_time))
+	)
+	return m
+})
+
+// для показа деталей одного слота
+const opened = ref<number | null>(null)
+function toggle(id: number) {
+	opened.value = opened.value === id ? null : id
+}
+
+// формат даты и дня недели
+function formatDate(d: string) {
+	const dt = new Date(d)
+	return dt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
+}
+function formatWeekday(d: string) {
+	const dt = new Date(d)
+	return dt.toLocaleDateString('ru-RU', { weekday: 'short' })
 }
 
 onMounted(async () => {
@@ -519,7 +556,8 @@ onMounted(async () => {
 					</p>
 				</div>
 			</div>
-			<section class="mt-8">
+
+			<section class="mt-8 mb-8">
 				<h2
 					v-if="isCurrentTeacher || isStudent"
 					class="text-2xl flex items-center gap-3 font-semibold mb-4"
@@ -529,8 +567,6 @@ onMounted(async () => {
 						<IconsReload class="w-5 h-5" />
 					</button>
 				</h2>
-
-				<!-- форма добавления (только для самого преподавателя) -->
 				<div v-if="isCurrentTeacher" class="mb-6 bg-white p-4 rounded shadow">
 					<h3 class="font-medium mb-2">Добавить новое окно</h3>
 					<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -562,13 +598,103 @@ onMounted(async () => {
 						Сохранить
 					</button>
 				</div>
-
-				<!-- список окон -->
-				<div class="space-y-4">
+				<div class="overflow-x-auto bg-white p-4 rounded shadow">
 					<div
-						v-for="slot in schedules.filter(
-							s => s.teacher.id === coursesStore.currentCourse.teacher.id
-						)"
+						class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4"
+					>
+						<!-- заголовок: дата и день -->
+						<div
+							v-for="date in uniqueDates"
+							:key="date"
+							class="text-center font-medium"
+						>
+							<div>{{ formatWeekday(date) }}</div>
+							<div class="text-lg">{{ formatDate(date) }}</div>
+						</div>
+					</div>
+
+					<div
+						class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mt-4"
+					>
+						<div v-for="date in uniqueDates" :key="date" class="space-y-4">
+							<div
+								v-for="slot in byDate[date]"
+								:key="slot.id"
+								class="border p-3 rounded"
+							>
+								<div class="flex justify-between items-center">
+									<div>
+										<div class="font-semibold">{{ slot.title }}</div>
+										<div class="text-sm">
+											{{ slot.start_time.slice(0, 5) }}–{{
+												slot.end_time.slice(0, 5)
+											}}
+										</div>
+									</div>
+									<button
+										@click="toggle(slot.id)"
+										class="text-blue-600 text-sm"
+									>
+										{{
+											opened === slot.id
+												? '×'
+												: slot.appointments.length + '/' + slot.max_slots
+										}}
+									</button>
+								</div>
+
+								<transition name="fade">
+									<div v-if="opened === slot.id" class="mt-2 text-sm space-y-1">
+										<div v-for="appt in slot.appointments" :key="appt.id">
+											{{ appt.position }}. {{ appt.first_name }}
+											{{ appt.last_name }}
+										</div>
+										<div v-if="!slot.appointments.length" class="text-gray-500">
+											Никто не записан
+										</div>
+									</div>
+								</transition>
+
+								<button
+									v-if="isStudent"
+									@click="
+										slot.appointments.some(
+											a =>
+												a.first_name === authStore.user?.first_name &&
+												a.last_name === authStore.user?.last_name
+										)
+											? cancelSignup(slot.id)
+											: signup(slot.id)
+									"
+									:class="[
+										'px-3 py-1 rounded font-medium text-xs mt-2',
+										slot.appointments.some(
+											a =>
+												a.first_name === authStore.user?.first_name &&
+												a.last_name === authStore.user?.last_name
+										)
+											? 'bg-red-600 text-white hover:bg-red-700'
+											: 'bg-blue-600 text-white hover:bg-blue-700',
+									]"
+								>
+									{{
+										slot.appointments.some(
+											a =>
+												a.first_name === authStore.user?.first_name &&
+												a.last_name === authStore.user?.last_name
+										)
+											? 'Отменить запись'
+											: 'Записаться'
+									}}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="space-y-4 mt-8">
+					<div
+						v-for="slot in schedules"
 						:key="slot.id"
 						class="bg-white p-4 rounded shadow flex flex-col md:flex-row md:justify-between md:items-center"
 					>
@@ -589,9 +715,8 @@ onMounted(async () => {
 							</p>
 						</div>
 
-						<!-- действия -->
-						<div class="mt-3 md:mt-0 space-x-2">
-							<!-- студент -->
+						<!-- <div class="mt-3 md:mt-0 space-x-2">
+							
 							<button
 								v-if="isStudent"
 								@click="
@@ -625,7 +750,7 @@ onMounted(async () => {
 								}}
 							</button>
 
-							<!-- преподаватель видит список записавшихся -->
+							
 							<ul v-if="isCurrentTeacher" class="mt-4 space-y-1 text-sm">
 								<li
 									v-for="appt in slot.appointments"
@@ -641,7 +766,7 @@ onMounted(async () => {
 									Никто не записан
 								</li>
 							</ul>
-						</div>
+						</div> -->
 					</div>
 				</div>
 			</section>
@@ -653,3 +778,14 @@ onMounted(async () => {
 		</div>
 	</div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+	transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+	opacity: 0;
+}
+</style>

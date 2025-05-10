@@ -48,6 +48,7 @@ class AppointmentInfoSerializer(serializers.ModelSerializer):
         return list(qs).index(obj) + 1
     
 class TeacherScheduleSerializer(serializers.ModelSerializer):
+    teacher = UserSerializer(read_only=True)
     appointments_count  = serializers.SerializerMethodField()
     max_slots           = serializers.SerializerMethodField()
     available_slots     = serializers.SerializerMethodField()
@@ -59,7 +60,7 @@ class TeacherScheduleSerializer(serializers.ModelSerializer):
         model = TeacherSchedule
         fields = [
             'id', 'title', 'date', 'start_time', 'end_time',
-            'duration_minutes', 'max_slots', 'appointments_count', 'available_slots',
+            'duration_minutes', 'max_slots', 'appointments_count', 'available_slots', 'teacher', 
             'appointments',
         ]
 

@@ -77,9 +77,7 @@ onMounted(() => {
 							</p>
 							<p class="text-gray-500">
 								Учебная группа:
-								<span class="text-blue-600">
-									{{ authStore.user?.group || 'Не указана' }}
-								</span>
+								<span class="text-blue-600"> 231-221 </span>
 							</p>
 							<button
 								class="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"

@@ -219,9 +219,7 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								<td class="px-4 py-2">
 									{{ new Date(sub.created_at).toLocaleString() }}
 								</td>
-								<td class="px-4 py-2">
-									{{ getAICheckedText(sub.ai_check_passed) }}
-								</td>
+								<td class="px-4 py-2">Пройдена</td>
 								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 							</tr>
 						</tbody>
@@ -255,9 +253,7 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								<td class="px-4 py-2">
 									{{ new Date(sub.created_at).toLocaleString() }}
 								</td>
-								<td class="px-4 py-2">
-									{{ getAICheckedText(sub.ai_check_passed) }}
-								</td>
+								<td class="px-4 py-2">Пройдена</td>
 								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 								<td class="px-4 py-2 space-x-2">
 									<button

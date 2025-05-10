@@ -692,7 +692,7 @@ onMounted(async () => {
 					</div>
 				</div>
 
-				<div class="space-y-4 mt-8">
+				<!-- <div class="space-y-4 mt-8">
 					<div
 						v-for="slot in schedules"
 						:key="slot.id"
@@ -715,8 +715,7 @@ onMounted(async () => {
 							</p>
 						</div>
 
-						<!-- <div class="mt-3 md:mt-0 space-x-2">
-							
+						<div class="mt-3 md:mt-0 space-x-2">
 							<button
 								v-if="isStudent"
 								@click="
@@ -750,7 +749,6 @@ onMounted(async () => {
 								}}
 							</button>
 
-							
 							<ul v-if="isCurrentTeacher" class="mt-4 space-y-1 text-sm">
 								<li
 									v-for="appt in slot.appointments"
@@ -766,9 +764,9 @@ onMounted(async () => {
 									Никто не записан
 								</li>
 							</ul>
-						</div> -->
+						</div>
 					</div>
-				</div>
+				</div> -->
 			</section>
 		</div>
 

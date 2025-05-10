@@ -12,7 +12,7 @@ const props = defineProps({
 
 <template>
 	<div>
-		<NuxtLink :to="{ name: 'courses-id', params: { id: props.id } }">
+		<NuxtLink to="#">
 			<img :src="props.img" :alt="props.title" class="w-full h-auto block" />
 			<div class="absolute bottom-5 left-2 text-white p-2 box-border">
 				<span class="inline-block bg-[#2D2F31] py-2 px-6 mb-2">{{

@@ -566,7 +566,9 @@ onMounted(async () => {
 				<!-- список окон -->
 				<div class="space-y-4">
 					<div
-						v-for="slot in schedules.filter(s => s.appointments.length)"
+						v-for="slot in schedules.filter(
+							s => s.teacher.id === coursesStore.currentCourse.teacher.id
+						)"
 						:key="slot.id"
 						class="bg-white p-4 rounded shadow flex flex-col md:flex-row md:justify-between md:items-center"
 					>

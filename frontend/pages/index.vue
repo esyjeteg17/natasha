@@ -3,43 +3,36 @@ const q = ref('')
 </script>
 
 <template>
-	<section class="py-10">
-		<div class="max-w-7xl mx-auto">
-			<h1 class="text-3xl font-bold mt-10 mb-6">Наши Лучшие курсы</h1>
-		</div>
+	<section class="pb-10 w-11/12 mx-auto max-w-7xl">
+		<h1 class="text-3xl font-bold mt-10 mb-6">Наши лучшие курсы</h1>
 
-		<div
-			class="max-w-7xl mx-auto grid gap-5"
-			style="grid-template-columns: 2fr 1fr; grid-template-rows: repeat(2, 1fr)"
-		>
+		<div class="grid grid-cols-1 md:grid-cols-3 grid-rows-2 gap-5">
 			<CourseItemMain
-				style="grid-column: 1 / 2; grid-row: 1 / 3"
-				class="relative"
-				:id="5"
-				img="/img/courses/course_1.png"
-				title="Название первого курса"
-				teacher="Категория 1"
-				date="01 Мар 2024"
+				class="md:col-span-2 md:row-span-2"
+				:id="101"
+				slug="vue-3"
+				img="/img/courses/be3fbaaf1e6937c6a841c6ecff3d022b.jpg"
+				title="Полный курс по Vue.js 3"
+				teacher="Максим Петров"
+				date="15 мар 2025"
 			/>
 
 			<CourseItemMain
-				style="grid-column: 2 / 3; grid-row: 1 / 2"
-				class="relative"
-				:id="3"
-				img="/img/courses/course_1.png"
-				title="Название второго курса"
-				teacher="Категория 2"
-				date="13 Мар 2024"
+				:id="102"
+				slug="python"
+				img="/img/courses/scale_1200.jpeg"
+				title="Продвинутый Python для аналитиков"
+				teacher="Наташа Котюшева"
+				date="28 фев 2025"
 			/>
 
 			<CourseItemMain
-				style="grid-column: 2 / 3; grid-row: 2 / 3"
-				class="relative"
-				:id="2"
-				img="/img/courses/course_1.png"
-				title="Название третьего курса"
-				teacher="Категория 3"
-				date="25 Май 2024"
+				:id="103"
+				slug="design"
+				img="/img/courses/c92f97fd043da7423ec1940deef5b471_big.jpg"
+				title="Основы графического дизайна"
+				teacher="Анна Иванова"
+				date="05 апр 2025"
 			/>
 		</div>
 	</section>

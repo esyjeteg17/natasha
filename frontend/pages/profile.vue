@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-
 const authStore = useAuthStore()
 const router = useRouter()
 
 // Redirect if not authenticated
+onMounted(() => {
+	if (!authStore.user) router.push('/login')
+})
+
 onMounted(() => {
 	if (!authStore.user) {
 		router.push('/login')
@@ -26,6 +26,54 @@ async function loadMyCourses() {
 		myCourses.value = data || []
 	} catch (e) {
 		console.error('Failed to load courses', e)
+	}
+}
+
+// Режим редактирования
+const editMode = ref(false)
+
+// Локальная копия полей профиля
+const form = reactive({
+	first_name: '',
+	last_name: '',
+	email: '',
+	phone: '',
+})
+
+function startEdit() {
+	if (!authStore.user) return
+	editMode.value = true
+	// заполняем форму текущими данными
+	form.first_name = authStore.user.first_name || ''
+	form.last_name = authStore.user.last_name || ''
+	form.email = authStore.user.email || ''
+	form.phone = authStore.user.phone || ''
+}
+
+function cancelEdit() {
+	editMode.value = false
+}
+
+// Сохраняем изменения
+async function saveProfile() {
+	if (!authStore.user) return
+	try {
+		const updated = await $fetch(`/api/users/${authStore.user.id}/`, {
+			baseURL: authStore.baseURL,
+			method: 'PATCH',
+			headers: { Authorization: `Bearer ${authStore.accessToken}` },
+			body: {
+				first_name: form.first_name,
+				last_name: form.last_name,
+				email: form.email,
+				phone: form.phone,
+			},
+		})
+		authStore.user = updated
+		editMode.value = false
+	} catch (e: any) {
+		console.error('Ошибка при сохранении профиля', e)
+		alert('Не удалось сохранить: ' + (e.data?.detail || e.message))
 	}
 }
 
@@ -49,41 +97,98 @@ onMounted(() => {
 					<div
 						class="grid grid-cols-1 md:grid-cols-[250px_auto_1fr] gap-8 items-start"
 					>
-						<!-- Avatar -->
-						<div class="w-full h-auto">
+						<div>
 							<img
 								src="/img/profile.png"
 								alt="Profile"
 								class="w-full h-full object-cover rounded-lg"
 							/>
 						</div>
-						<!-- Stats -->
-						<!-- Contact -->
-						<div class="space-y-6">
-							<p class="text-gray-500">
-								Адрес электронной почты:
-								<a
-									:href="`mailto:${authStore.user?.email}`"
-									class="text-blue-600 hover:underline"
-								>
-									{{ authStore.user?.email }}
-								</a>
-							</p>
-							<p class="text-gray-500">
-								Номер телефона:
-								<span class="text-blue-600">
+						<div class="col-span-2 space-y-6">
+							<template v-if="!editMode">
+								<p>
+									<span class="font-medium">Имя:</span>
+									{{ authStore.user?.first_name }}
+								</p>
+								<p>
+									<span class="font-medium">Фамилия:</span>
+									{{ authStore.user?.last_name }}
+								</p>
+								<p>
+									<span class="font-medium">Email: </span>
+									<a
+										:href="`mailto:${authStore.user?.email}`"
+										class="text-blue-600 hover:underline"
+									>
+										{{ authStore.user?.email }}
+									</a>
+								</p>
+								<p>
+									<span class="font-medium">Телефон:</span>
 									{{ authStore.user?.phone || 'Не указан' }}
-								</span>
-							</p>
-							<p class="text-gray-500">
-								Учебная группа:
-								<span class="text-blue-600"> 231-221 </span>
-							</p>
-							<button
-								class="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
-							>
-								Редактировать данные
-							</button>
+								</p>
+								<button
+									@click="startEdit"
+									class="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+								>
+									Редактировать данные
+								</button>
+							</template>
+
+							<template v-else>
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div>
+										<label class="block text-sm font-medium mb-1">Имя</label>
+										<input
+											v-model="form.first_name"
+											type="text"
+											class="w-full border px-3 py-2 rounded"
+										/>
+									</div>
+									<div>
+										<label class="block text-sm font-medium mb-1"
+											>Фамилия</label
+										>
+										<input
+											v-model="form.last_name"
+											type="text"
+											class="w-full border px-3 py-2 rounded"
+										/>
+									</div>
+									<div>
+										<label class="block text-sm font-medium mb-1">Email</label>
+										<input
+											v-model="form.email"
+											type="email"
+											class="w-full border px-3 py-2 rounded"
+										/>
+									</div>
+									<div>
+										<label class="block text-sm font-medium mb-1"
+											>Телефон</label
+										>
+										<input
+											v-model="form.phone"
+											type="text"
+											class="w-full border px-3 py-2 rounded"
+										/>
+									</div>
+								</div>
+								<div class="mt-4 flex gap-2">
+									<button
+										@click="saveProfile"
+										class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition"
+									>
+										Сохранить
+									</button>
+									<button
+										@click="cancelEdit"
+										class="bg-gray-300 text-gray-800 px-6 py-2 rounded hover:bg-gray-400 transition"
+									>
+										Отмена
+									</button>
+								</div>
+							</template>
 						</div>
 					</div>
 				</div>

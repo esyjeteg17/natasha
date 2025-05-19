@@ -691,86 +691,9 @@ onMounted(async () => {
 						</div>
 					</div>
 				</div>
-
-				<!-- <div class="space-y-4 mt-8">
-					<div
-						v-for="slot in schedules"
-						:key="slot.id"
-						class="bg-white p-4 rounded shadow flex flex-col md:flex-row md:justify-between md:items-center"
-					>
-						<div>
-							<p class="font-medium">{{ slot.title }}</p>
-							<p class="text-sm text-gray-600">
-								{{ new Date(slot.date).toLocaleDateString() }}
-								({{
-									new Date(slot.date).toLocaleString('ru-RU', {
-										weekday: 'long',
-									})
-								}}) с {{ slot.start_time.slice(0, 5) }} до
-								{{ slot.end_time.slice(0, 5) }} ({{ slot.duration_minutes }}
-								мин)
-							</p>
-							<p class="text-sm">
-								Свободно: {{ slot.available_slots }} / {{ slot.max_slots }}
-							</p>
-						</div>
-
-						<div class="mt-3 md:mt-0 space-x-2">
-							<button
-								v-if="isStudent"
-								@click="
-									slot.appointments.some(
-										a =>
-											a.first_name === authStore.user?.first_name &&
-											a.last_name === authStore.user?.last_name
-									)
-										? cancelSignup(slot.id)
-										: signup(slot.id)
-								"
-								:class="[
-									'px-3 py-1 rounded font-medium',
-									slot.appointments.some(
-										a =>
-											a.first_name === authStore.user?.first_name &&
-											a.last_name === authStore.user?.last_name
-									)
-										? 'bg-red-600 text-white hover:bg-red-700'
-										: 'bg-blue-600 text-white hover:bg-blue-700',
-								]"
-							>
-								{{
-									slot.appointments.some(
-										a =>
-											a.first_name === authStore.user?.first_name &&
-											a.last_name === authStore.user?.last_name
-									)
-										? 'Отменить запись'
-										: 'Записаться'
-								}}
-							</button>
-
-							<ul v-if="isCurrentTeacher" class="mt-4 space-y-1 text-sm">
-								<li
-									v-for="appt in slot.appointments"
-									:key="appt.id"
-									class="flex justify-between px-2"
-								>
-									<span
-										>{{ appt.position }}. {{ appt.first_name }}
-										{{ appt.last_name }}</span
-									>
-								</li>
-								<li v-if="!slot.appointments.length" class="text-gray-500">
-									Никто не записан
-								</li>
-							</ul>
-						</div>
-					</div>
-				</div> -->
 			</section>
 		</div>
 
-		<!-- Placeholder for other tabs -->
 		<div v-else class="p-4 text-gray-500">
 			Содержание раздела «{{ activeTab }}» пока не реализовано.
 		</div>

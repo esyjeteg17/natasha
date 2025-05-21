@@ -32,7 +32,7 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
     serializer_class = DocumentSerializer
-
+    
     MAX_CHARS = 3000  # порог для части текста при сжатии
 
     def extract_full_text(self, path):
@@ -82,6 +82,11 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
         # 4) извлечение полного текста и подсчёт слов
         full_text = self.extract_full_text(tmp_path)
         word_count = len(full_text.split())
+       # проверка: минимум 100 слов
+        if word_count < 100:
+            raise ValidationError({
+                'file': f'Документ должен содержать минимум 100 слов, найдено {word_count}.'
+            })
 
         # 5) проверяем и скачиваем стоп-слова NLTK, если нужно
         try:

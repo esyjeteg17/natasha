@@ -120,7 +120,7 @@ class DocumentReviewViewSet(viewsets.GenericViewSet,
                 eval_prompt = (
                     f"Оцени работу студента по теме '{topic}'.\n"
                     f"Вот резюме его текста:\n{compressed}\n"
-                    "Дай подробный развёрнутый ответ без JSON."
+                    "Дай подробный развёрнутый ответ без JSON. Дай более человечный ответ"
                 )
                 resp_eval = giga.chat(eval_prompt)
                 raw_evaluation = resp_eval.choices[0].message.content.strip()

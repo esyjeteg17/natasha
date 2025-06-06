@@ -93,9 +93,9 @@ async function runDocReview(file: File, topic: string) {
 	} else {
 		aiResult.value = await resp.json()
 	}
-
-    alert('вы записались на окошко у преподавателя')
-
+	if (aiResult.value.passed) {
+		alert('Ваша запись на приём к преподавателю успешно оформлена')
+	}
 	showAIModal.value = true
 	idAIChecking.value = false
 }
@@ -172,11 +172,8 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 					</span>
 				</div>
 				<div v-if="currentTask.file">
-					<a
-						:href="currentTask.file"
-						target="_blank"
-						class="inline-flex items-center text-blue-600 hover:underline"
-					>
+					<a :href="currentTask.file" target="_blank"
+						class="inline-flex items-center text-blue-600 hover:underline">
 						<IconsDownloadFile class="w-5 h-5 mr-2" /> Скачать файл задания
 					</a>
 				</div>
@@ -185,17 +182,10 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 				<div v-if="!isTeacher">
 					<p class="mb-4">{{ currentTask.description }}</p>
 					<div class="space-y-4 mb-6">
-						<input
-							type="file"
-							accept=".docx"
-							@change="onFileSelected"
-							class="block w-full"
-						/>
+						<input type="file" accept=".docx" @change="onFileSelected" class="block w-full" />
 						<button
 							class="px-6 py-2 flex items-center bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-							:disabled="!file || idAIChecking"
-							@click="submitAnswer"
-						>
+							:disabled="!file || idAIChecking" @click="submitAnswer">
 							<IconsSpiner v-if="idAIChecking" class="w-5 h-5 mr-2" />
 							Отправить ответ
 						</button>
@@ -259,18 +249,14 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 								<td class="px-4 py-2">Пройдена</td>
 								<td class="px-4 py-2">{{ getSubmStatus(sub.status) }}</td>
 								<td class="px-4 py-2 space-x-2">
-									<button
-										v-if="sub.status !== 'approved'"
+									<button v-if="sub.status !== 'approved'"
 										@click="changeSubmissionStatus(sub, 'approved')"
-										class="px-2 py-1 bg-green-600 text-white rounded"
-									>
+										class="px-2 py-1 bg-green-600 text-white rounded">
 										Принять
 									</button>
-									<button
-										v-if="sub.status !== 'rejected'"
+									<button v-if="sub.status !== 'rejected'"
 										@click="changeSubmissionStatus(sub, 'rejected')"
-										class="px-2 py-1 bg-red-600 text-white rounded"
-									>
+										class="px-2 py-1 bg-red-600 text-white rounded">
 										Отклонить
 									</button>
 								</td>
@@ -284,17 +270,12 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 		</div>
 
 		<!-- Модалка с результатами AI -->
-		<div
-			v-if="showAIModal && aiResult"
-			class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-		>
+		<div v-if="showAIModal && aiResult"
+			class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
 			<div class="bg-white rounded-lg shadow-xl max-w-xl w-full p-6 space-y-4">
 				<h3 class="text-lg font-semibold">
 					Результаты AI-проверки
-					<span
-						:class="aiResult.passed ? 'text-green-600' : 'text-red-600'"
-						class="ml-2"
-					>
+					<span :class="aiResult.passed ? 'text-green-600' : 'text-red-600'" class="ml-2">
 						{{ aiResult.passed ? 'Пройдено' : 'Не пройдено' }}
 					</span>
 				</h3>
@@ -315,17 +296,11 @@ async function changeSubmissionStatus(sub: Submission, newStatus: string) {
 					</div>
 				</div>
 				<div class="flex justify-end space-x-2">
-					<button
-						class="px-4 py-2 border rounded hover:bg-gray-100"
-						@click="showAIModal = false"
-					>
+					<button class="px-4 py-2 border rounded hover:bg-gray-100" @click="showAIModal = false">
 						Закрыть
 					</button>
-					<button
-						v-if="aiResult.passed"
-						class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-						@click="confirmSubmission"
-					>
+					<button v-if="aiResult.passed" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+						@click="confirmSubmission">
 						Подтвердить и отправить
 					</button>
 				</div>

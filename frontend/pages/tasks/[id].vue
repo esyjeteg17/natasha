@@ -93,6 +93,9 @@ async function runDocReview(file: File, topic: string) {
 	} else {
 		aiResult.value = await resp.json()
 	}
+
+    alert('вы записались на окошко у преподавателя')
+
 	showAIModal.value = true
 	idAIChecking.value = false
 }
